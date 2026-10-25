@@ -3,19 +3,32 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="description" content="Split founder equity fairly with Shapley values: founders score solo value and synergies privately, the app averages the scores and computes the split.">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%231F5FA8'/%3E%3Cpath d='M16 16V5a11 11 0 0 1 11 11z' fill='%23fff'/%3E%3Cpath d='M16 16h11A11 11 0 1 1 16 5z' fill='%23fff' opacity='.55'/%3E%3C/svg%3E">
-<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
 <title>Shapley Split</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
+<meta name="description" content="Split founder equity fairly with Shapley values. Each founder scores solo values and synergies in private; the facilitator reveals the scores and the app computes the split.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%231F5FA8'/%3E%3Cpath d='M16 16V5a11 11 0 0 1 11 11z' fill='%23fff'/%3E%3Cpath d='M16 16h11A11 11 0 1 1 16 5z' fill='%23fff' opacity='.55'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,600;8..60,700&display=swap">
+<script>
+/* ============================================================
+   LIVE SYNC SETTINGS
+   Paste your Firebase web app config here (see README.md).
+   The same project can serve the Negotiation Planner too.
+   Leave projectId empty to run in "this device only" mode.
+   ============================================================ */
+window.FIREBASE_CONFIG = {
+  apiKey: "AIzaSyAE-3dw_rTjmPagq9b4yQ2YTV8URXtdzpo",
+  authDomain: "negotiation-planner.firebaseapp.com",
+  projectId: "negotiation-planner",
+  appId: "1:598156375153:web:e179f3c3fb261aa575d7d0"
+};
+</script>
 <style>
-/* Layout: one working column (max 1080px) — tabs across the top, each step a stack of ledger-style panels. */
+/* Layout: one working column (max 1080px) with step tabs; each step is a stack of panels. */
 :root{
   --bg:#F3F5F8; --panel:#FFFFFF; --ink:#15213A; --muted:#536079; --line:#D9DFE8; --soft:#EBEFF5;
   --accent:#1F5FA8; --accent-ink:#FFFFFF; --accent-soft:#E4EDF8;
   --ok:#1C7A4E; --ok-soft:#E2F2E9; --warn:#A8460E; --warn-soft:#FBEBDF; --bad:#B42335;
-  --display:"Source Serif 4",Georgia,serif; --body:"IBM Plex Sans",system-ui,sans-serif; --mono:"IBM Plex Mono",ui-monospace,monospace;
+  --display:"Source Serif 4",Georgia,serif; --body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif; --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
   --bg:#0F1522; --panel:#172033; --ink:#E6ECF5; --muted:#A3B0C6; --line:#2B3852; --soft:#1E2A40;
@@ -26,42 +39,49 @@
   --accent:#7FB0EC; --accent-ink:#0F1522; --accent-soft:#1D3150;
   --ok:#6BC79A; --ok-soft:#173A2A; --warn:#F0A570; --warn-soft:#3C2617; --bad:#F2818F; color-scheme:dark}
 *{box-sizing:border-box}
-body{background:var(--bg);color:var(--ink);font:15px/1.5 var(--body);padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:28px 64px}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:15px/1.5 var(--body);padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:24px 64px}
+[hidden]{display:none!important}
 .wrap{max-width:1080px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
 h1,h2,h3{font-family:var(--display);margin:0;line-height:1.15;text-wrap:balance}
-h1{font-size:clamp(30px,4.4vw,42px)}
-h2{font-size:24px}
+h1{font-size:clamp(28px,4.2vw,40px)}
+h2{font-size:23px}
 h3{font-size:18px}
 p{margin:0}
 .muted{color:var(--muted)}
-.mono,.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
 header.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:16px}
 header.top .sub{max-width:62ch;color:var(--muted);margin-top:6px}
-.badge{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;font-size:12.5px;font-weight:600;letter-spacing:.02em;background:var(--accent-soft);color:var(--accent)}
+.badge{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;font-size:12.5px;font-weight:600;background:var(--accent-soft);color:var(--accent);white-space:nowrap;text-decoration:none}
 .badge.warn{background:var(--warn-soft);color:var(--warn)}
 .badge.ok{background:var(--ok-soft);color:var(--ok)}
+.badge.grey{background:var(--soft);color:var(--muted)}
 nav.tabs{display:flex;gap:4px;padding:4px;background:var(--soft);border-radius:12px;overflow-x:auto}
 nav.tabs button{flex:1 0 auto;border:0;background:transparent;color:var(--muted);font:600 14px var(--body);padding:10px 14px;border-radius:9px;cursor:pointer;display:flex;align-items:center;gap:8px;white-space:nowrap}
 nav.tabs button .n{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-size:12px;background:var(--panel);color:var(--muted)}
 nav.tabs button[aria-selected="true"]{background:var(--panel);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.08)}
 nav.tabs button[aria-selected="true"] .n{background:var(--accent);color:var(--accent-ink)}
-nav.tabs button:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+section[role=tabpanel]{display:flex;flex-direction:column;gap:20px}
 .panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px 22px;display:flex;flex-direction:column;gap:14px;min-width:0}
 .panel-h{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:8px 16px}
 .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:20px}
-label.lbl{font-size:12.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:14px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px;display:flex;flex-direction:column;gap:10px}
+.card p{flex:1}
+.lbl{font-size:12.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
 input[type=text],input[type=number],select,textarea{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px;min-width:0}
 input[type=number]{font-family:var(--mono);width:96px;text-align:right}
-textarea{width:100%;font-family:var(--mono);font-size:12.5px;min-height:84px;resize:vertical}
-.btn{font:600 14px var(--body);border-radius:9px;padding:9px 14px;cursor:pointer;border:1px solid var(--line);background:var(--panel);color:var(--ink);display:inline-flex;align-items:center;gap:8px}
+.btn{font:600 14px var(--body);border-radius:9px;padding:9px 14px;cursor:pointer;border:1px solid var(--line);background:var(--panel);color:var(--ink);display:inline-flex;align-items:center;gap:8px;white-space:nowrap;text-decoration:none}
 .btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
 .btn.ghost{background:transparent}
 .btn.small{padding:5px 10px;font-size:13px}
+.btn.danger{color:var(--warn);border-color:var(--warn)}
 .btn[disabled]{opacity:.5;cursor:not-allowed}
 .row{display:flex;flex-wrap:wrap;align-items:center;gap:10px}
 .dot{width:12px;height:12px;border-radius:4px;flex:none}
 .chip{display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border-radius:999px;border:1px solid var(--line);background:var(--bg);font-size:13.5px;font-weight:500;cursor:pointer;color:var(--ink)}
-.chip[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent);color:var(--ink)}
+.chip[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent)}
 .list{display:flex;flex-direction:column}
 .item{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;padding:10px 0;border-top:1px solid var(--line)}
 .item:first-child{border-top:0}
@@ -80,92 +100,117 @@ td.r,th.r{text-align:right}
 .callout{border-radius:10px;padding:12px 14px;background:var(--soft);font-size:14px}
 .callout.warn{background:var(--warn-soft)}
 .callout.ok{background:var(--ok-soft)}
-.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;font-weight:600;font-size:14px;z-index:20}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;font-weight:600;font-size:14px;z-index:20;max-width:90vw}
 .formula{font-family:var(--mono);background:var(--soft);border-radius:8px;padding:10px 12px;font-size:13.5px;overflow-x:auto;white-space:nowrap}
 ol.steps{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:8px}
 .cmp td{font-family:var(--mono)}
-section[role=tabpanel]{display:flex;flex-direction:column;gap:20px}
+.seal{display:flex;gap:14px;align-items:center}
+.seal svg{flex:none;color:var(--accent)}
 @media (prefers-reduced-motion:no-preference){.bar>i{transition:width .35s ease}}
 </style>
 </head>
 <body>
-
 <div class="wrap">
   <header class="top">
     <div>
-      <div class="row"><span class="badge">Business Modeling · Session 5</span><span class="badge" id="teamBadge">Team</span></div>
+      <div class="row"><a class="badge" href="#" id="homeLink">Business Modeling · Session 5</a><span class="badge" id="teamBadge"></span><span class="badge grey" id="syncBadge"></span></div>
       <h1 style="margin-top:10px">Shapley Split</h1>
-      <p class="sub">Score each founder's solo value and the synergies between them. The app averages everyone's scores and splits the founder equity by Shapley value. It works for teams of any size.</p>
+      <p class="sub" id="subline">Split founder equity by Shapley value. Each founder scores solo values and synergies in private. The facilitator reveals everyone's scores at once, and the app computes the split.</p>
     </div>
-    <div class="row">
-      <button class="btn ghost small" id="btnExample" type="button">Load LoopBox example</button>
-      <button class="btn ghost small" id="btnNew" type="button">Start a new team</button>
-    </div>
+    <div class="row" id="topActions"></div>
   </header>
-
-  <nav class="tabs" role="tablist" aria-label="Steps">
-    <button role="tab" id="tab-setup" aria-controls="view-setup" data-tab="setup"><span class="n">1</span>Set up the team</button>
-    <button role="tab" id="tab-score" aria-controls="view-score" data-tab="score"><span class="n">2</span>Score privately</button>
-    <button role="tab" id="tab-combine" aria-controls="view-combine" data-tab="combine"><span class="n">3</span>Combine scores</button>
-    <button role="tab" id="tab-results" aria-controls="view-results" data-tab="results"><span class="n">4</span>Results</button>
-    <button role="tab" id="tab-method" aria-controls="view-method" data-tab="method"><span class="n">?</span>How it computes</button>
-  </nav>
-
-  <section id="view-setup" role="tabpanel" aria-labelledby="tab-setup" hidden></section>
-  <section id="view-score" role="tabpanel" aria-labelledby="tab-score" hidden></section>
-  <section id="view-combine" role="tabpanel" aria-labelledby="tab-combine" hidden></section>
-  <section id="view-results" role="tabpanel" aria-labelledby="tab-results" hidden></section>
-  <section id="view-method" role="tabpanel" aria-labelledby="tab-method" hidden></section>
+  <div id="home" hidden></div>
+  <div id="app" hidden>
+    <nav class="tabs" role="tablist" aria-label="Steps">
+      <button role="tab" id="tab-setup" aria-controls="view-setup" data-tab="setup"><span class="n">1</span>Set up the team</button>
+      <button role="tab" id="tab-score" aria-controls="view-score" data-tab="score"><span class="n">2</span>Score privately</button>
+      <button role="tab" id="tab-status" aria-controls="view-status" data-tab="status"><span class="n">3</span>Status &amp; reveal</button>
+      <button role="tab" id="tab-results" aria-controls="view-results" data-tab="results"><span class="n">4</span>Results</button>
+      <button role="tab" id="tab-method" aria-controls="view-method" data-tab="method"><span class="n">?</span>How it computes</button>
+    </nav>
+    <section id="view-setup" role="tabpanel" aria-labelledby="tab-setup" hidden></section>
+    <section id="view-score" role="tabpanel" aria-labelledby="tab-score" hidden></section>
+    <section id="view-status" role="tabpanel" aria-labelledby="tab-status" hidden></section>
+    <section id="view-results" role="tabpanel" aria-labelledby="tab-results" hidden></section>
+    <section id="view-method" role="tabpanel" aria-labelledby="tab-method" hidden></section>
+  </div>
 </div>
 
 <script>
-/* ---------------- state ---------------- */
+/* ===================== helpers ===================== */
 const COLORS=['#1F5FA8','#0E6B5C','#C08A2A','#7A4C9E','#B0460C','#2F7F9E','#9C3D6B','#5B7A1E','#6B5BD6','#8A6A4A','#2E5E8F','#B5651D'];
-function example(){return{
-  team:{name:'LoopBox',pool:10,
-    members:[{id:'alex',name:'Alex'},{id:'sam',name:'Sam'},{id:'jordan',name:'Jordan'},{id:'taylor',name:'Taylor'},{id:'casey',name:'Casey'}],
-    groups:[{id:'g1',members:['alex','sam'],note:'Vision + working product = fundable'},
-            {id:'g2',members:['sam','casey'],note:'Return-point data that actually runs'},
-            {id:'g3',members:['alex','jordan'],note:'Pitch + community'},
-            {id:'g4',members:['alex','casey'],note:'Handshakes into signed contracts'},
-            {id:'g5',members:['sam','taylor'],note:'Product that works at the return point'},
-            {id:'g6',members:['jordan','taylor'],note:'Design the campus loves'},
-            {id:'g7',members:['alex','sam','jordan'],note:'The trio that can launch'}]},
-  sets:[{by:'Video estimates',byId:'video',solo:{alex:10,sam:8,jordan:6,taylor:4,casey:4},syn:{g1:20,g2:10,g3:8,g4:8,g5:6,g6:4,g7:12}}],
-  example:true};}
-let S=load()||example();
-let ui={tab:'results',scorer:null,draft:null,sel:[]};
-function save(){try{localStorage.setItem('shapley-split-v1',JSON.stringify(S))}catch(e){}}
-function load(){try{const v=JSON.parse(localStorage.getItem('shapley-split-v1'));return v&&v.team?v:null}catch(e){return null}}
 const $=s=>document.querySelector(s);
-const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const uid=p=>p+Math.random().toString(36).slice(2,8);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const rid=(n=20)=>{const a='ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';let s='';for(const x of crypto.getRandomValues(new Uint8Array(n)))s+=a[x%a.length];return s};
+const DEL={__del:true};
+function setPath(o,p,v){const ks=p.split('.');let a=o;for(let i=0;i<ks.length-1;i++){if(a[ks[i]]==null||typeof a[ks[i]]!=='object')a[ks[i]]={};a=a[ks[i]]}if(v===DEL)delete a[ks.at(-1)];else a[ks.at(-1)]=v}
+const ls={get(k){try{return JSON.parse(localStorage.getItem(k))}catch(e){return null}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}};
+const fmt=(x,d=1)=>Number.isFinite(x)?x.toFixed(d):'–';
+function toast(m){const t=document.createElement('div');t.className='toast';t.setAttribute('role','status');t.textContent=m;document.body.appendChild(t);setTimeout(()=>t.remove(),2600)}
+function copyText(t){try{navigator.clipboard.writeText(t).then(()=>toast('Copied'),()=>toast('Copy this: '+t))}catch(e){toast('Copy this: '+t)}}
+function factStr(n){if(n>20)return n+'!';let f=1;for(let i=2;i<=n;i++)f*=i;return f.toLocaleString()}
+
+/* ===================== stores ===================== */
+const CFG=window.FIREBASE_CONFIG||{};const LIVE_OK=!!(CFG.projectId&&CFG.apiKey);
+let fb=null;
+function loadScript(src){return new Promise((res,rej)=>{const s=document.createElement('script');s.src=src;s.onload=res;s.onerror=()=>rej(new Error('Could not load '+src));document.head.appendChild(s)})}
+async function initFirebase(){if(fb)return fb;const V='10.12.2';
+  await loadScript(`https://www.gstatic.com/firebasejs/${V}/firebase-app-compat.js`);
+  await loadScript(`https://www.gstatic.com/firebasejs/${V}/firebase-auth-compat.js`);
+  await loadScript(`https://www.gstatic.com/firebasejs/${V}/firebase-firestore-compat.js`);
+  firebase.initializeApp(CFG);const cred=await firebase.auth().signInAnonymously();fb={db:firebase.firestore(),uid:cred.user.uid};return fb}
+class LiveTeam{constructor(id){this.id=id;this.live=true}
+  ref(){return fb.db.collection('shapley').doc(this.id)}
+  me(){return fb.uid}
+  async exists(){return (await this.ref().get()).exists}
+  async create(d){d.owner=fb.uid;d.updatedAt=Date.now();await this.ref().set(d)}
+  subscribe(cb,err){this.u1=this.ref().onSnapshot(s=>cb(s.exists?s.data():null),err)}
+  async update(paths){const u={};for(const p in paths)u[p]=paths[p]===DEL?firebase.firestore.FieldValue.delete():paths[p];u.updatedAt=Date.now();await this.ref().update(u)}
+  async getScore(){const s=await this.ref().collection('scores').doc(fb.uid).get();return s.exists?s.data():null}
+  async setScore(d){await this.ref().collection('scores').doc(fb.uid).set(d)}
+  watchScores(cb,err){if(this.u2)return;this.u2=this.ref().collection('scores').onSnapshot(q=>cb(q.docs.map(d=>({sid:d.id,...d.data()}))),e=>{this.u2=null;err&&err(e)})}
+  unwatchScores(){if(this.u2){this.u2();this.u2=null}}}
+class LocalTeam{constructor(id){this.id=id;this.live=false;this.key='ss-team-'+id;this.cbs=[];this.scb=null;
+  this.bc=('BroadcastChannel' in window)?new BroadcastChannel('ss-'+id):null;if(this.bc)this.bc.onmessage=()=>this.emit()}
+  me(){return 'local'}
+  async exists(){return !!ls.get(this.key)}
+  async create(d){d.owner='local';d.scores=d.scores||{};ls.set(this.key,d)}
+  subscribe(cb){this.cbs.push(cb);setTimeout(()=>this.emit(),0)}
+  emit(){const d=ls.get(this.key);if(!d)return;const pub={...d};delete pub.scores;this.cbs.forEach(cb=>cb(pub));if(this.scb)this.scb(Object.entries(d.scores||{}).map(([sid,s])=>({sid,...s})))}
+  async update(paths){const d=ls.get(this.key);for(const p in paths)setPath(d,p,paths[p]);d.updatedAt=Date.now();ls.set(this.key,d);if(this.bc)this.bc.postMessage(1);this.emit()}
+  async getScore(memberId){const d=ls.get(this.key);return (d.scores||{})['m_'+memberId]||null}
+  async setScore(data){const d=ls.get(this.key);d.scores=d.scores||{};d.scores['m_'+data.memberId]=data;ls.set(this.key,d);if(this.bc)this.bc.postMessage(1)}
+  watchScores(cb){const first=!this.scb;this.scb=cb;if(first)setTimeout(()=>this.emit(),0)}
+  unwatchScores(){this.scb=null}}
+
+/* ===================== model ===================== */
+let store=null,R=null,SCORES=[],S=null,SCORES_LOADED=false;
+let ui={tab:null,scorer:null,draft:null,sel:[],confirmReveal:false};
+function fpOf(team){const m=Object.keys(team.members||{}).sort().join(',');const g=Object.entries(team.groups||{}).map(([id,x])=>id+':'+[...x.members].sort().join('.')).sort().join(',');
+  let h=0;for(const c of m+'|'+g)h=(h*31+c.charCodeAt(0))>>>0;return h.toString(36)}
+function buildS(){const t=R.team||{};const members=Object.entries(t.members||{}).sort((a,b)=>(a[1].o||0)-(b[1].o||0)).map(([id,m])=>({id,name:m.name||'?'}));
+  const groups=Object.entries(t.groups||{}).sort((a,b)=>(a[1].o||0)-(b[1].o||0)).map(([id,g])=>({id,members:(g.members||[]).filter(x=>(t.members||{})[x]),note:g.note||''})).filter(g=>g.members.length>=2);
+  const fp=fpOf(t);const valid=SCORES.filter(s=>s.f===fp);
+  S={team:{name:t.name||'Team',pool:Number.isFinite(t.pool)?t.pool:10,members,groups},sets:valid.map(s=>({by:s.by,byId:s.memberId||s.sid,solo:s.solo||{},syn:s.syn||{}})),stale:SCORES.length-valid.length,fp,example:!!R.example}}
+const isFac=()=>!store.live||R.owner===store.me();
 const col=id=>COLORS[Math.max(0,S.team.members.findIndex(m=>m.id===id))%COLORS.length];
 const nameOf=id=>(S.team.members.find(m=>m.id===id)||{name:'?'}).name;
 const gName=g=>g.members.map(nameOf).join(' + ');
-const fmt=(x,d=1)=>Number.isFinite(x)?x.toFixed(d):'–';
-function toast(msg){const t=document.createElement('div');t.className='toast';t.setAttribute('role','status');t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),2200)}
-function fingerprint(){const s=S.team.members.map(m=>m.id).join(',')+'|'+S.team.groups.map(g=>g.id+':'+g.members.join('.')).join(',');let h=0;for(const c of s)h=(h*31+c.charCodeAt(0))>>>0;return h.toString(36)}
-const enc=o=>btoa(unescape(encodeURIComponent(JSON.stringify(o)))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
-const dec=s=>JSON.parse(decodeURIComponent(escape(atob(s.replace(/-/g,'+').replace(/_/g,'/')))));
+function participants(){const sub=R.submitted||{};return Object.entries(sub).map(([uid,p])=>({uid,...p}))}
 
-/* ---------------- maths ---------------- */
-// Average the scorers' inputs item by item (a blank counts as "no opinion", not zero).
+/* ===================== maths ===================== */
 function averaged(){const solo={},syn={},spread={};const T=S.team;
   const items=[...T.members.map(m=>['s',m.id]),...T.groups.map(g=>['g',g.id])];
   for(const [k,id] of items){const vals=S.sets.map(x=>(k==='s'?x.solo:x.syn)[id]).filter(v=>Number.isFinite(v));
-    const avg=vals.length?vals.reduce((a,b)=>a+b,0)/vals.length:0;(k==='s'?solo:syn)[id]=avg;
-    spread[k+id]={n:vals.length,min:Math.min(...vals),max:Math.max(...vals),avg};}
-  return{solo,syn,spread};}
-// Shapley for a solo + synergy model: each person keeps their solo value and an equal share of every synergy they belong to.
+    const avg=vals.length?vals.reduce((a,b)=>a+b,0)/vals.length:0;(k==='s'?solo:syn)[id]=avg;spread[k+id]={n:vals.length,min:Math.min(...vals),max:Math.max(...vals),avg}}
+  return{solo,syn,spread}}
 function shapley(solo,syn){const T=S.team;const phi={},parts={};let total=0;
-  T.members.forEach(m=>{phi[m.id]=solo[m.id]||0;parts[m.id]=[{label:'solo',v:solo[m.id]||0,color:col(m.id)}];total+=solo[m.id]||0});
+  T.members.forEach(m=>{phi[m.id]=solo[m.id]||0;parts[m.id]=[{label:'solo',v:solo[m.id]||0}];total+=solo[m.id]||0});
   T.groups.forEach(g=>{const v=syn[g.id]||0;total+=v;g.members.forEach(id=>{if(!(id in phi))return;phi[id]+=v/g.members.length;
-    parts[id].push({label:(g.members.length===2?'½':'1/'+g.members.length)+' of '+gName(g),v:v/g.members.length,gid:g.id})})});
-  return{phi,parts,total};}
+    parts[id].push({label:(g.members.length===2?'½':'1/'+g.members.length)+' of '+gName(g),v:v/g.members.length})})});
+  return{phi,parts,total}}
 function shares(phi,total){const pot=100-S.team.pool;const out={};for(const id in phi)out[id]=total>0?phi[id]/total*pot:NaN;return out}
-// Cross-check: rebuild the full coalition table v(S) and run the textbook subset formula.
-function crossCheck(solo,syn){const T=S.team,n=T.members.length;if(n>14)return null;const t0=performance.now();
+function crossCheck(solo,syn){const T=S.team,n=T.members.length;if(n>14||n<1)return null;const t0=performance.now();
   const idx={};T.members.forEach((m,i)=>idx[m.id]=i);const N=1<<n;const v=new Float64Array(N);
   const gm=T.groups.map(g=>({mask:g.members.reduce((a,id)=>a|(1<<idx[id]),0),val:syn[g.id]||0}));
   for(let s=1;s<N;s++){let x=0;for(let i=0;i<n;i++)if(s&(1<<i))x+=solo[T.members[i].id]||0;for(const g of gm)if((s&g.mask)===g.mask)x+=g.val;v[s]=x}
@@ -174,164 +219,214 @@ function crossCheck(solo,syn){const T=S.team,n=T.members.length;if(n>14)return n
   for(let i=0;i<n;i++){const b=1<<i;for(let s=0;s<N;s++){if(s&b)continue;const k=pc(s);phi[i]+=fact[k]*fact[n-k-1]/fact[n]*(v[s|b]-v[s])}}
   return{phi,coalitions:N-1,ms:performance.now()-t0}}
 
-/* ---------------- tabs ---------------- */
-function setTab(t){ui.tab=t;document.querySelectorAll('nav.tabs button').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.tab===t)));
-  ['setup','score','combine','results','method'].forEach(k=>{$('#view-'+k).hidden=k!==t});
-  ({setup:renderSetup,score:renderScore,combine:renderCombine,results:renderResults,method:renderMethod})[t]();
-  try{if(location.hash!=='#'+t)history.replaceState(null,'','#'+t)}catch(e){}}
-document.querySelectorAll('nav.tabs button').forEach(b=>b.addEventListener('click',()=>setTab(b.dataset.tab)));
-function header(){$('#teamBadge').textContent=(S.example?'Example · ':'')+S.team.name+' · '+S.team.members.length+' people'}
+/* ===================== example ===================== */
+function exampleDoc(){const members={},groups={};let o=1;const m=(id,name)=>members[id]={name,o:o++};
+  m('alex','Alex');m('sam','Sam');m('jordan','Jordan');m('taylor','Taylor');m('casey','Casey');
+  const g=(id,ms,note)=>groups[id]={members:ms,note,o:o++};
+  g('g1',['alex','sam'],'Vision + working product = fundable');g('g2',['sam','casey'],'Return-point data that actually runs');g('g3',['alex','jordan'],'Pitch + community');
+  g('g4',['alex','casey'],'Handshakes into signed contracts');g('g5',['sam','taylor'],'Product that works at the return point');g('g6',['jordan','taylor'],'Design the campus loves');g('g7',['alex','sam','jordan'],'The trio that can launch');
+  const team={name:'LoopBox',pool:10,members,groups};
+  return{v:1,example:true,team,revealed:true,submitted:{},scores:{video:{by:'Video estimates',memberId:null,f:fpOf(team),t:Date.now(),solo:{alex:10,sam:8,jordan:6,taylor:4,casey:4},syn:{g1:20,g2:10,g3:8,g4:8,g5:6,g6:4,g7:12}}}}}
+function blankDoc(){return{v:1,team:{name:'My team',pool:10,members:{},groups:{}},revealed:false,submitted:{}}}
 
-/* ---------------- 1. setup ---------------- */
-function renderSetup(){const T=S.team;const n=T.members.length;
+/* ===================== routing ===================== */
+function route(){const h=location.hash.slice(1);const m=h.match(/^(team|local)=([A-Za-z0-9]{8,40})$/);
+  if(m)return openTeam(m[1],m[2]);if(h==='example')return openExample();renderHome()}
+window.addEventListener('hashchange',route);
+async function openExample(){const st=new LocalTeam('LoopBoxExample');if(!(await st.exists()))await st.create(exampleDoc());location.hash='local=LoopBoxExample'}
+function header(){const t=R&&R.team;$('#teamBadge').hidden=!t;if(t)$('#teamBadge').textContent=(R.example?'Example · ':'')+(t.name||'Team')+' · '+Object.keys(t.members||{}).length+' people';
+  $('#syncBadge').textContent=store?(store.live?'Live':'This device only'):(LIVE_OK?'Live sync on':'This device only');
+  $('#topActions').innerHTML=store?`${store.live?'<button class="btn small" type="button" id="copyLink">Copy team link</button>':''}${R&&R.example?'<button class="btn small ghost" type="button" id="resetEx">Reset example</button>':''}<a class="btn small ghost" href="#">All teams</a>`:'';
+  const cl=$('#copyLink');if(cl)cl.addEventListener('click',()=>copyText(location.href.split('#')[0]+'#team='+store.id));
+  const re=$('#resetEx');if(re)re.addEventListener('click',async()=>{await new LocalTeam('LoopBoxExample').create(exampleDoc());store.emit();toast('Example reset')})}
+function remember(){const k=store.live?'team':'local';const r=(ls.get('ss-recent')||[]).filter(x=>!(x.k===k&&x.id===store.id));r.unshift({k,id:store.id,t:(R.team||{}).name});ls.set('ss-recent',r.slice(0,10))}
+
+/* ===================== home ===================== */
+function renderHome(){store=null;R=null;$('#app').hidden=true;const h=$('#home');h.hidden=false;header();
+  const recent=(ls.get('ss-recent')||[]).slice(0,6);
+  h.innerHTML=`<div class="cards">
+   <div class="card"><h3>Explore the example</h3><p class="muted">The LoopBox team from the course video, already scored and revealed.</p><a class="btn" href="#example">Open the LoopBox example</a></div>
+   <div class="card"><h3>Start a team</h3><p class="muted">${LIVE_OK?'You become the facilitator. Share the team link; each founder scores on their own device.':'Live sync is not set up in this copy. Founders take turns scoring on this one device.'}</p>
+    <label class="row" style="gap:8px;font-size:14px"><input type="checkbox" id="fromEx"> Start from the LoopBox setup</label><button class="btn primary" type="button" id="newTeam">Create team</button></div>
+   <div class="card"><h3>Join your team</h3><p class="muted">Paste the team link your facilitator shared.</p><input type="text" id="joinLink" placeholder="https://…#team=…" aria-label="Team link"><button class="btn" type="button" id="joinBtn">Open team</button></div>
+  </div>
+  ${recent.length?`<div class="panel"><h3>Recently opened on this device</h3><div class="list">${recent.map(r=>`<div class="item"><span class="grow">${esc(r.t||'Untitled team')}</span><span class="muted">${r.k==='team'?'Live':'This device'}</span><a class="btn small" href="#${r.k}=${esc(r.id)}">Open</a></div>`).join('')}</div></div>`:''}`;
+  $('#newTeam').addEventListener('click',async()=>{let d=blankDoc();if($('#fromEx').checked){const e=exampleDoc();d.team=e.team}else{d.team.members[rid(8)]={name:'Founder 1',o:1};d.team.members[rid(8)]={name:'Founder 2',o:2};d.team.members[rid(8)]={name:'Founder 3',o:3}}
+    const id=rid(22);try{if(LIVE_OK){await initFirebase();await new LiveTeam(id).create(d);location.hash='team='+id}else{await new LocalTeam(id).create(d);location.hash='local='+id}}catch(e){toast('Could not create the team: '+e.message)}});
+  $('#joinBtn').addEventListener('click',()=>{const v=$('#joinLink').value.trim();const m=v.match(/#?((?:team|local)=[A-Za-z0-9]{8,40})/);if(m)location.hash=m[1];else toast('That does not look like a team link')})}
+
+/* ===================== open a team ===================== */
+async function openTeam(kind,id){if(store&&store.unwatchScores)store.unwatchScores();$('#home').hidden=true;$('#app').hidden=false;ui={tab:null,scorer:null,draft:null,sel:[],confirmReveal:false};SCORES=[];SCORES_LOADED=false;
+  showMsg('Opening the team…');
+  try{if(kind==='team'){if(!LIVE_OK)throw new Error('This link needs live sync, but this copy of the app has no Firebase settings.');await initFirebase();store=new LiveTeam(id)}else store=new LocalTeam(id);
+    if(!(await store.exists()))throw new Error('No team found at this link. Check that the whole link was copied.');
+    let first=true;
+    store.subscribe(d=>{if(!d)return;R=d;
+      if(R.revealed)store.watchScores(list=>{SCORES=list;SCORES_LOADED=true;buildS();rerender()},e=>{console.error(e)});else{store.unwatchScores();SCORES=[];SCORES_LOADED=false}
+      buildS();header();if(first){first=false;remember();
+        const mine=participants().find(p=>p.uid===store.me());if(store.live&&mine)ui.scorer=mine.memberId;
+        setTab(R.revealed?'results':(isFac()&&!participants().length?'setup':'score'))}else rerender()},e=>{showMsg('The connection to the team was lost. Reload the page to try again.');console.error(e)})}
+  catch(e){showMsg(e.message,true)}}
+function showMsg(m,back){['setup','score','status','results','method'].forEach(k=>$('#view-'+k).hidden=true);let el=$('#appMsg');if(!el){el=document.createElement('div');el.id='appMsg';el.className='panel';$('#app').appendChild(el)}
+  el.hidden=false;el.innerHTML=`<p>${esc(m)}</p>${back?'<div class="row"><a class="btn" href="#">Back to start</a></div>':''}`}
+
+/* ===================== tabs ===================== */
+function setTab(t){ui.tab=t;const m=$('#appMsg');if(m)m.hidden=true;
+  document.querySelectorAll('nav.tabs button').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.tab===t)));
+  ['setup','score','status','results','method'].forEach(k=>$('#view-'+k).hidden=k!==t);RENDER[t]()}
+document.querySelectorAll('nav.tabs button').forEach(b=>b.addEventListener('click',()=>setTab(b.dataset.tab)));
+function rerender(){if(!ui.tab)return;const act=document.activeElement;const inView=act&&$('#view-'+ui.tab).contains(act)&&/INPUT|TEXTAREA|SELECT/.test(act.tagName);
+  if(ui.tab==='score'){renderScoreStatus();return}if(inView)return;RENDER[ui.tab]()}
+const W=paths=>store.update(paths).catch(e=>{toast('Not saved: '+(e.message||'check your connection'));console.error(e)});
+
+/* ===================== 1. setup ===================== */
+function renderSetup(){const T=S.team,n=T.members.length,fac=isFac(),dis=fac?'':'disabled';const anySub=participants().some(p=>p.state==='submitted')||SCORES.length;
   $('#view-setup').innerHTML=`
+  ${fac?'':'<div class="callout">Only the facilitator can change the team setup. You can see it here.</div>'}
+  ${fac&&anySub?'<div class="callout warn">Scores have already been submitted. Changing people or synergies now means everyone must score again.</div>':''}
   <div class="grid2">
    <div class="panel">
     <div class="panel-h"><h2>Team</h2><span class="muted">${n} people</span></div>
-    <div class="row"><label class="lbl" for="tName" style="min-width:110px">Team name</label><input type="text" id="tName" value="${esc(T.name)}" style="flex:1"></div>
-    <div class="row"><label class="lbl" for="tPool" style="min-width:110px">Option pool %</label><input type="number" id="tPool" min="0" max="50" step="1" value="${T.pool}"><span class="muted">Reserved for future hires. Shapley splits the other ${100-T.pool}%.</span></div>
-    <div class="list" id="memList">${T.members.map(m=>`<div class="item"><span class="dot" style="background:${col(m.id)}"></span>
-      <label class="sr" for="mn-${m.id}" hidden>Name</label><input type="text" id="mn-${m.id}" data-mname="${m.id}" value="${esc(m.name)}" class="grow" aria-label="Name of team member">
-      <button class="btn small ghost" type="button" data-mdel="${m.id}" ${n<=2?'disabled':''} aria-label="Remove ${esc(m.name)}">Remove</button></div>`).join('')}</div>
-    <div class="row"><input type="text" id="newMember" placeholder="Add a person" aria-label="New team member name" style="flex:1"><button class="btn" type="button" id="addMember">Add person</button></div>
+    <div class="row"><label class="lbl" for="tName" style="min-width:110px">Team name</label><input type="text" id="tName" value="${esc(T.name)}" style="flex:1" ${dis}></div>
+    <div class="row"><label class="lbl" for="tPool" style="min-width:110px">Option pool %</label><input type="number" id="tPool" min="0" max="50" step="1" value="${T.pool}" ${dis}><span class="muted">Shapley splits the other ${100-T.pool}%.</span></div>
+    <div class="list">${T.members.map(m=>`<div class="item"><span class="dot" style="background:${col(m.id)}"></span>
+      <input type="text" data-mname="${m.id}" value="${esc(m.name)}" class="grow" aria-label="Name of team member" ${dis}>
+      ${fac?`<button class="btn small ghost" type="button" data-mdel="${m.id}" ${n<=2?'disabled':''} aria-label="Remove ${esc(m.name)}">Remove</button>`:''}</div>`).join('')}</div>
+    ${fac?`<div class="row"><input type="text" id="newMember" placeholder="Add a person" aria-label="New team member name" style="flex:1"><button class="btn" type="button" id="addMember">Add person</button></div>`:''}
    </div>
    <div class="panel">
     <div class="panel-h"><h2>Synergies</h2><span class="muted">${T.groups.length} groups</span></div>
     <p class="muted">List only the combinations that create value together. Pairs are most common. Add a trio or larger group when the value only appears with all of them.</p>
     <div class="list">${T.groups.map(g=>`<div class="item"><div class="row grow" style="gap:6px">${g.members.map(id=>`<span class="dot" style="background:${col(id)}"></span>`).join('')}<b>${esc(gName(g))}</b></div>
-      <input type="text" data-gnote="${g.id}" value="${esc(g.note||'')}" placeholder="Why this works" aria-label="Why ${esc(gName(g))} creates value" style="flex:2 1 220px">
-      <button class="btn small ghost" type="button" data-gdel="${g.id}">Remove</button></div>`).join('')||'<p class="muted">No synergies yet. With none, Shapley simply pays each person their solo value.</p>'}</div>
-    <div class="callout"><div class="lbl" style="margin-bottom:8px">New synergy: pick 2 or more people</div>
-      <div class="row" id="pick">${T.members.map(m=>`<button type="button" class="chip" data-pick="${m.id}" aria-pressed="${ui.sel.includes(m.id)}"><span class="dot" style="background:${col(m.id)}"></span>${esc(m.name)}</button>`).join('')}</div>
-      <div class="row" style="margin-top:10px"><button class="btn" type="button" id="addGroup" ${ui.sel.length<2?'disabled':''}>Add synergy${ui.sel.length>=2?': '+esc(ui.sel.map(nameOf).join(' + ')):''}</button></div></div>
+      <input type="text" data-gnote="${g.id}" value="${esc(g.note)}" placeholder="Why this works" aria-label="Why ${esc(gName(g))} creates value" style="flex:2 1 220px" ${dis}>
+      ${fac?`<button class="btn small ghost" type="button" data-gdel="${g.id}">Remove</button>`:''}</div>`).join('')||'<p class="muted">No synergies yet. With none, Shapley simply pays each person their solo value.</p>'}</div>
+    ${fac?`<div class="callout"><div class="lbl" style="margin-bottom:8px">New synergy: pick 2 or more people</div>
+      <div class="row">${T.members.map(m=>`<button type="button" class="chip" data-pick="${m.id}" aria-pressed="${ui.sel.includes(m.id)}"><span class="dot" style="background:${col(m.id)}"></span>${esc(m.name)}</button>`).join('')}</div>
+      <div class="row" style="margin-top:10px"><button class="btn" type="button" id="addGroup" ${ui.sel.length<2?'disabled':''}>Add synergy${ui.sel.length>=2?': '+esc(ui.sel.map(nameOf).join(' + ')):''}</button></div></div>`:''}
    </div>
   </div>
-  <div class="panel">
-    <div class="panel-h"><h2>Share the setup</h2><span class="muted">Everyone must score the same team</span></div>
-    <p>Send this code to every founder. They open this page, paste it under <b>Score privately</b>, and score on their own device.</p>
-    <textarea id="setupCode" readonly aria-label="Setup code">${'SS1.'+enc({team:S.team})}</textarea>
-    <div class="row"><button class="btn primary" type="button" id="copySetup">Copy setup code</button>
-      <span class="muted">${S.sets.length?`Changing people or synergies after scoring makes earlier score codes stop matching.`:''}</span></div>
-  </div>`;
-  const v=$('#view-setup');
-  $('#tName').addEventListener('input',e=>{S.team.name=e.target.value||'Team';S.example=false;save();header()});
-  $('#tPool').addEventListener('change',e=>{S.team.pool=Math.max(0,Math.min(50,Math.round(+e.target.value||0)));save();renderSetup()});
-  v.querySelectorAll('[data-mname]').forEach(i=>i.addEventListener('input',e=>{const m=S.team.members.find(x=>x.id===e.target.dataset.mname);m.name=e.target.value||'?';save();header()}));
-  v.querySelectorAll('[data-mname]').forEach(i=>i.addEventListener('change',()=>renderSetup()));
-  v.querySelectorAll('[data-mdel]').forEach(b=>b.addEventListener('click',()=>{const id=b.dataset.mdel;S.team.members=S.team.members.filter(m=>m.id!==id);
-    S.team.groups=S.team.groups.map(g=>({...g,members:g.members.filter(x=>x!==id)})).filter(g=>g.members.length>=2);ui.sel=ui.sel.filter(x=>x!==id);S.example=false;save();header();renderSetup()}));
-  const add=()=>{const nm=$('#newMember').value.trim();if(!nm)return;S.team.members.push({id:uid('m'),name:nm});S.example=false;save();header();renderSetup();$('#newMember').focus()};
+  ${store.live?`<div class="panel"><div class="panel-h"><h2>Invite the team</h2></div><p>Send the team link to every founder. Each one opens it, chooses their name under <b>Score privately</b>, and scores on their own device.</p>
+   <div class="row"><button class="btn primary" type="button" id="copyLink2">Copy team link</button><span class="muted">Anyone with the link can score as a team member. Only you can change the setup and reveal the scores.</span></div></div>`
+   :`<div class="panel"><div class="panel-h"><h2>Scoring on one device</h2></div><p>Live sync is off in this copy, so founders take turns on this device under <b>Score privately</b>. Each person's numbers disappear from the screen as soon as they submit.</p></div>`}`;
+  const v=$('#view-setup');const c2=$('#copyLink2');if(c2)c2.addEventListener('click',()=>copyText(location.href.split('#')[0]+'#team='+store.id));
+  if(!fac)return;
+  $('#tName').addEventListener('change',e=>W({'team.name':e.target.value.trim()||'Team'}));
+  $('#tPool').addEventListener('change',e=>W({'team.pool':Math.max(0,Math.min(50,Math.round(+e.target.value||0)))}));
+  v.querySelectorAll('[data-mname]').forEach(i=>i.addEventListener('change',e=>W({['team.members.'+e.target.dataset.mname+'.name']:e.target.value.trim()||'?'})));
+  v.querySelectorAll('[data-mdel]').forEach(b=>b.addEventListener('click',()=>{const id=b.dataset.mdel;const u={['team.members.'+id]:DEL};
+    for(const g of S.team.groups)if(g.members.includes(id)){const rest=g.members.filter(x=>x!==id);u['team.groups.'+g.id]=rest.length>=2?{...R.team.groups[g.id],members:rest}:DEL}
+    ui.sel=ui.sel.filter(x=>x!==id);W(u)}));
+  const add=()=>{const nm=$('#newMember').value.trim();if(!nm)return;W({['team.members.'+rid(8)]:{name:nm,o:Date.now()}}).then(()=>setTimeout(()=>{const n=$('#newMember');n&&n.focus()},50))};
   $('#addMember').addEventListener('click',add);$('#newMember').addEventListener('keydown',e=>{if(e.key==='Enter')add()});
   v.querySelectorAll('[data-pick]').forEach(b=>b.addEventListener('click',()=>{const id=b.dataset.pick;ui.sel=ui.sel.includes(id)?ui.sel.filter(x=>x!==id):[...ui.sel,id];renderSetup()}));
   $('#addGroup').addEventListener('click',()=>{const key=[...ui.sel].sort().join('.');if(S.team.groups.some(g=>[...g.members].sort().join('.')===key)){toast('That synergy is already listed');return}
-    const order=S.team.members.map(m=>m.id);S.team.groups.push({id:uid('g'),members:[...ui.sel].sort((a,b)=>order.indexOf(a)-order.indexOf(b)),note:''});ui.sel=[];S.example=false;save();renderSetup()});
-  v.querySelectorAll('[data-gnote]').forEach(i=>i.addEventListener('input',e=>{S.team.groups.find(g=>g.id===e.target.dataset.gnote).note=e.target.value;save()}));
-  v.querySelectorAll('[data-gdel]').forEach(b=>b.addEventListener('click',()=>{S.team.groups=S.team.groups.filter(g=>g.id!==b.dataset.gdel);S.example=false;save();renderSetup()}));
-  $('#copySetup').addEventListener('click',()=>copy($('#setupCode')));}
-function copy(ta){const t=ta.value;const done=()=>toast('Copied');
-  try{navigator.clipboard.writeText(t).then(done,()=>{ta.select();toast('Selected. Press Ctrl+C or ⌘C to copy')})}catch(e){ta.select();toast('Selected. Press Ctrl+C or ⌘C to copy')}}
+    const order=S.team.members.map(m=>m.id);const ms=[...ui.sel].sort((a,b)=>order.indexOf(a)-order.indexOf(b));ui.sel=[];W({['team.groups.'+rid(8)]:{members:ms,note:'',o:Date.now()}})});
+  v.querySelectorAll('[data-gnote]').forEach(i=>i.addEventListener('change',e=>W({['team.groups.'+e.target.dataset.gnote+'.note']:e.target.value})))}
 
-/* ---------------- 2. score ---------------- */
-function blankDraft(){const d={solo:{},syn:{}};const ex=S.sets.find(x=>x.byId===ui.scorer);
-  S.team.members.forEach(m=>d.solo[m.id]=ex&&Number.isFinite(ex.solo[m.id])?ex.solo[m.id]:'');S.team.groups.forEach(g=>d.syn[g.id]=ex&&Number.isFinite(ex.syn[g.id])?ex.syn[g.id]:'');return d}
-function renderScore(){const T=S.team;if(!ui.scorer||(ui.scorer!=='fac'&&!T.members.some(m=>m.id===ui.scorer)))ui.scorer=null;
-  if(ui.scorer&&!ui.draft)ui.draft=blankDraft();
-  $('#view-score').innerHTML=`
+/* ===================== 2. score ===================== */
+async function renderScore(){const T=S.team;const v=$('#view-score');
+  if(R.example){v.innerHTML=`<div class="panel"><h2>This is a finished example</h2><p class="muted">The LoopBox scores are already revealed. Create your own team on the start page to try private scoring.</p></div>`;return}
+  if(ui.scorer&&!T.members.some(m=>m.id===ui.scorer))ui.scorer=null;
+  const taken=participants().filter(p=>p.uid!==store.me());
+  v.innerHTML=`
   <div class="panel">
-   <div class="panel-h"><h2>Score privately</h2><span class="muted">Your scores stay on this device until you send your code</span></div>
-   <div class="grid2" style="gap:14px">
-    <div><label class="lbl" for="joinCode">Joining a team? Paste the setup code</label>
-      <div class="row" style="margin-top:6px"><input type="text" id="joinCode" placeholder="SS1.…" style="flex:1" aria-describedby="joinHelp"><button class="btn" type="button" id="joinBtn">Load team</button></div>
-      <p class="muted" id="joinHelp" style="margin-top:6px;font-size:13px">This replaces the team on this device. Currently: <b>${esc(T.name)}</b>, ${T.members.length} people, ${T.groups.length} synergies.</p></div>
-    <div><label class="lbl" for="who">Who is scoring?</label>
-      <select id="who" style="display:block;margin-top:6px;width:100%"><option value="">Choose your name</option>${T.members.map(m=>`<option value="${m.id}" ${ui.scorer===m.id?'selected':''}>${esc(m.name)}</option>`).join('')}<option value="fac" ${ui.scorer==='fac'?'selected':''}>Facilitator (one agreed score set)</option></select></div>
-   </div>
+   <div class="panel-h"><h2>Score privately</h2><span id="scoreState"></span></div>
+   <div class="seal"><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+    <p class="muted">${store.live?'Your scores are sealed. Nobody, the facilitator included, can see them until the facilitator reveals all scores at once. You can change them until then.':'Scoring on one device: when you submit, your numbers disappear from the screen so the next person cannot see them.'}</p></div>
+   <div class="row"><label class="lbl" for="who">I am</label>
+    <select id="who" ${R.revealed?'disabled':''}><option value="">Choose your name</option>${T.members.map(m=>{const t=store.live&&taken.find(p=>p.memberId===m.id);return `<option value="${m.id}" ${ui.scorer===m.id?'selected':''}>${esc(m.name)}${t?' (already joined)':''}</option>`}).join('')}</select></div>
   </div>
-  ${ui.scorer?`
-  <div class="panel">
-   <div class="panel-h"><h3>How to score</h3></div>
-   <p>Use points on one scale for the whole team: roughly <b>100 = the company with everyone on board</b>. Solo value is what each person could build alone. A synergy is the <i>extra</i> value that only appears when that group works together. A synergy can be negative when two people overlap or clash. Leave a box blank if you have no view.</p>
-  </div>
+  <div id="scoreBody"></div>`;
+  $('#who').addEventListener('change',async e=>{ui.scorer=e.target.value||null;ui.draft=null;ui.done=false;
+    if(ui.scorer&&store.live)await W({['submitted.'+store.me()]:{memberId:ui.scorer,name:nameOf(ui.scorer),state:((R.submitted||{})[store.me()]||{}).state==='submitted'?'submitted':'joined',t:Date.now()}});
+    renderScoreBody()});
+  renderScoreStatus();renderScoreBody()}
+function renderScoreStatus(){const el=$('#scoreState');if(!el)return;const me=(R.submitted||{})[store.me()];
+  if(R.revealed)el.innerHTML='<span class="badge ok">Scores revealed</span>';
+  else if(store.live&&me&&me.state==='submitted')el.innerHTML=`<span class="badge ok">Submitted as ${esc(me.name)}</span>`;
+  else el.innerHTML='<span class="badge grey">Not submitted yet</span>'}
+async function renderScoreBody(){const T=S.team;const box=$('#scoreBody');if(!box)return;
+  if(R.revealed){box.innerHTML=`<div class="panel"><p>Scores are revealed. See <b>Results</b>. The facilitator can reopen scoring for a second round after the team has discussed the disagreements.</p></div>`;return}
+  if(!ui.scorer){box.innerHTML=`<div class="panel"><p class="muted">Choose your name to start. Score alone, without looking at anyone else's numbers.</p></div>`;return}
+  if(ui.done&&!store.live){box.innerHTML=`<div class="panel callout ok"><h3>Submitted for ${esc(nameOf(ui.scorer))}</h3><p>Pass the device to the next person. They choose their own name above.</p></div>`;return}
+  if(!ui.draft){let ex=null;try{ex=await store.getScore(ui.scorer)}catch(e){}const d={solo:{},syn:{}};
+    T.members.forEach(m=>d.solo[m.id]=ex&&ex.f===S.fp&&Number.isFinite(ex.solo[m.id])?ex.solo[m.id]:'');T.groups.forEach(g=>d.syn[g.id]=ex&&ex.f===S.fp&&Number.isFinite(ex.syn[g.id])?ex.syn[g.id]:'');
+    if(store.live)ui.draft=d;else ui.draft={solo:Object.fromEntries(T.members.map(m=>[m.id,''])),syn:Object.fromEntries(T.groups.map(g=>[g.id,'']))}}
+  const D=ui.draft;
+  box.innerHTML=`
+  <div class="panel"><h3>How to score</h3>
+   <p>Use one scale for the whole team: roughly <b>100 = the company with everyone on board</b>. Solo value is what each person could build alone. A synergy is the <i>extra</i> value that only appears when that group works together. A synergy can be negative when people overlap or clash. Leave a box blank if you have no view.</p></div>
   <div class="grid2">
    <div class="panel"><div class="panel-h"><h3>Solo value</h3><span class="muted">${T.members.length} scores</span></div>
     <div class="list">${T.members.map(m=>`<div class="item"><span class="dot" style="background:${col(m.id)}"></span><label for="so-${m.id}" class="grow">${esc(m.name)}${m.id===ui.scorer?' <span class="muted">(you)</span>':''}</label>
-      <input type="number" id="so-${m.id}" data-solo="${m.id}" min="0" max="100" step="1" inputmode="numeric" value="${ui.draft.solo[m.id]}"></div>`).join('')}</div></div>
+     <input type="number" id="so-${m.id}" data-solo="${m.id}" min="0" max="100" step="1" inputmode="numeric" value="${D.solo[m.id]??''}"></div>`).join('')}</div></div>
    <div class="panel"><div class="panel-h"><h3>Synergies</h3><span class="muted">${T.groups.length} scores</span></div>
     <div class="list">${T.groups.map(g=>`<div class="item"><div class="grow"><label for="sy-${g.id}"><b>${esc(gName(g))}</b></label>${g.note?`<div class="muted" style="font-size:13px">${esc(g.note)}</div>`:''}</div>
-      <input type="number" id="sy-${g.id}" data-syn="${g.id}" min="-100" max="100" step="1" inputmode="numeric" value="${ui.draft.syn[g.id]}"></div>`).join('')||'<p class="muted">No synergies in this setup.</p>'}</div></div>
+     <input type="number" id="sy-${g.id}" data-syn="${g.id}" min="-100" max="100" step="1" inputmode="numeric" value="${D.syn[g.id]??''}"></div>`).join('')||'<p class="muted">No synergies in this setup.</p>'}</div></div>
   </div>
-  <div class="panel">
-   <div class="panel-h"><h3>Your scores give this split</h3><span class="muted" id="sumNote"></span></div>
+  <div class="panel"><div class="panel-h"><h3>Your scores give this split</h3><span class="muted" id="sumNote"></span></div>
    <div id="preview"></div>
-   <div class="row">
-    <button class="btn primary" type="button" id="makeCode">Create my score code</button>
-    <button class="btn" type="button" id="addHere">Add to results on this device</button>
-   </div>
-   <textarea id="scoreCode" readonly hidden aria-label="Your score code"></textarea>
-   <p class="muted" id="codeHelp" hidden>Send this code to your facilitator, who pastes it under <b>Combine scores</b>. Nobody sees your numbers until you send it.</p>
-  </div>`:`<div class="panel"><p class="muted">Choose your name above to start. Each founder fills this in alone, without looking at anyone else's numbers.</p></div>`}`;
-  $('#joinBtn').addEventListener('click',()=>{const raw=$('#joinCode').value.trim();try{if(!raw.startsWith('SS1.'))throw 0;const o=dec(raw.slice(4));if(!o.team||!o.team.members)throw 0;
-    S={team:o.team,sets:[],example:false};ui={tab:'score',scorer:null,draft:null,sel:[]};save();header();renderScore();toast('Team loaded: '+o.team.name)}catch(e){toast('That is not a valid setup code')}});
-  $('#who').addEventListener('change',e=>{ui.scorer=e.target.value||null;ui.draft=null;renderScore()});
-  if(!ui.scorer)return;
-  const v=$('#view-score');
-  v.querySelectorAll('[data-solo]').forEach(i=>i.addEventListener('input',e=>{ui.draft.solo[e.target.dataset.solo]=e.target.value===''?'':+e.target.value;preview()}));
-  v.querySelectorAll('[data-syn]').forEach(i=>i.addEventListener('input',e=>{ui.draft.syn[e.target.dataset.syn]=e.target.value===''?'':+e.target.value;preview()}));
-  $('#makeCode').addEventListener('click',()=>{const ta=$('#scoreCode');ta.hidden=false;$('#codeHelp').hidden=false;ta.value='SC1.'+enc(packDraft());copy(ta)});
-  $('#addHere').addEventListener('click',()=>{addSet(packDraft());toast('Added to results');});
-  preview();}
-function packDraft(){const clean=o=>{const r={};for(const k in o)if(o[k]!==''&&Number.isFinite(+o[k]))r[k]=+o[k];return r};
-  const byId=ui.scorer;const by=byId==='fac'?'Facilitator':nameOf(byId);return{f:fingerprint(),byId,by,solo:clean(ui.draft.solo),syn:clean(ui.draft.syn)}}
+   <div class="row"><button class="btn primary" type="button" id="submitScore">${((R.submitted||{})[store.me()]||{}).state==='submitted'&&store.live?'Update my scores':'Submit my scores'}</button><span class="muted" id="subMsg" role="status"></span></div></div>`;
+  box.querySelectorAll('[data-solo]').forEach(i=>i.addEventListener('input',e=>{D.solo[e.target.dataset.solo]=e.target.value===''?'':+e.target.value;preview()}));
+  box.querySelectorAll('[data-syn]').forEach(i=>i.addEventListener('input',e=>{D.syn[e.target.dataset.syn]=e.target.value===''?'':+e.target.value;preview()}));
+  $('#submitScore').addEventListener('click',submitScore);preview()}
+function packDraft(){const clean=o=>{const r={};for(const k in o)if(o[k]!==''&&Number.isFinite(+o[k]))r[k]=+o[k];return r};return{solo:clean(ui.draft.solo),syn:clean(ui.draft.syn)}}
+async function submitScore(){const d=packDraft();if(!Object.keys(d.solo).length&&!Object.keys(d.syn).length){toast('Enter at least one score first');return}
+  const btn=$('#submitScore');btn.disabled=true;
+  try{await store.setScore({memberId:ui.scorer,by:nameOf(ui.scorer),f:S.fp,t:Date.now(),solo:d.solo,syn:d.syn});
+    if(store.live)await store.update({['submitted.'+store.me()]:{memberId:ui.scorer,name:nameOf(ui.scorer),state:'submitted',f:S.fp,t:Date.now()}});
+    else await store.update({['submitted.m_'+ui.scorer]:{memberId:ui.scorer,name:nameOf(ui.scorer),state:'submitted',f:S.fp,t:Date.now()}});
+    toast('Scores submitted');if(!store.live){ui.done=true;ui.draft=null;const w=$('#who');if(w)w.value=ui.scorer}renderScoreStatus();renderScoreBody()}
+  catch(e){toast(R.revealed?'Scores are already revealed, so they are locked.':'Not saved: '+(e.message||'check your connection'));btn.disabled=false}}
 function preview(){const d=packDraft();const solo={},syn={};S.team.members.forEach(m=>solo[m.id]=d.solo[m.id]||0);S.team.groups.forEach(g=>syn[g.id]=d.syn[g.id]||0);
-  const r=shapley(solo,syn);const sh=shares(r.phi,r.total);
-  $('#sumNote').textContent='Whole-team value from your scores: '+fmt(r.total,0)+' points';
-  $('#preview').innerHTML=r.total>0?`<div class="stack" role="img" aria-label="Your implied split">${S.team.members.map(m=>`<div style="flex:${Math.max(0,sh[m.id])};background:${col(m.id)}" title="${esc(m.name)} ${fmt(sh[m.id])}%">${sh[m.id]>=6?esc(m.name)+' '+fmt(sh[m.id])+'%':''}</div>`).join('')}<div style="flex:${S.team.pool};background:#8E99AB">${S.team.pool>=6?'Pool '+S.team.pool+'%':''}</div></div>`
-    :'<p class="muted">Enter some scores to see the split.</p>'}
+  const r=shapley(solo,syn);const sh=shares(r.phi,r.total);$('#sumNote').textContent='Whole-team value from your scores: '+fmt(r.total,0)+' points';
+  $('#preview').innerHTML=r.total>0?`<div class="stack" role="img" aria-label="Your implied split">${S.team.members.map(m=>`<div style="flex:${Math.max(0,sh[m.id])};background:${col(m.id)}">${sh[m.id]>=6?esc(m.name)+' '+fmt(sh[m.id])+'%':''}</div>`).join('')}<div style="flex:${S.team.pool};background:#8E99AB">${S.team.pool>=6?'Pool '+S.team.pool+'%':''}</div></div>`:'<p class="muted">Enter some scores to see the split.</p>'}
 
-/* ---------------- 3. combine ---------------- */
-function addSet(d){const i=S.sets.findIndex(x=>x.byId===d.byId);const set={by:d.by,byId:d.byId,solo:d.solo,syn:d.syn};if(i>=0)S.sets[i]=set;else S.sets.push(set);
-  if(S.example){S.sets=S.sets.filter(x=>x.byId!=='video');S.example=false}save();header()}
-function renderCombine(){const T=S.team;const scored=new Set(S.sets.map(x=>x.byId));const missing=T.members.filter(m=>!scored.has(m.id));
-  $('#view-combine').innerHTML=`
-  <div class="grid2">
-   <div class="panel">
-    <div class="panel-h"><h2>Paste score codes</h2></div>
-    <p>Paste one or more codes, separated by spaces or new lines. A newer code from the same person replaces the older one.</p>
-    <textarea id="pasteCodes" placeholder="SC1.…" aria-label="Score codes"></textarea>
-    <div class="row"><button class="btn primary" type="button" id="addCodes">Add scores</button><span class="muted" id="addMsg" role="status"></span></div>
-   </div>
-   <div class="panel">
-    <div class="panel-h"><h2>Score sets</h2><span class="muted">${S.sets.length} included</span></div>
-    <div class="list">${S.sets.map((x,i)=>`<div class="item"><span class="dot" style="background:${x.byId==='fac'||x.byId==='video'?'#8E99AB':col(x.byId)}"></span><span class="grow"><b>${esc(x.by)}</b> <span class="muted">· ${Object.keys(x.solo).length+Object.keys(x.syn).length} scores</span></span>
-      <button class="btn small ghost" type="button" data-rm="${i}">Remove</button></div>`).join('')||'<p class="muted">No scores yet. Paste codes on the left, or score on this device under Score privately.</p>'}</div>
-    ${missing.length&&S.sets.length?`<div class="callout warn">Still waiting for: ${missing.map(m=>esc(m.name)).join(', ')}</div>`:''}
-   </div>
+/* ===================== 3. status & reveal ===================== */
+function renderStatus(){const T=S.team;const ps=participants();const fac=isFac();
+  const byMember={};ps.forEach(p=>{(byMember[p.memberId]=byMember[p.memberId]||[]).push(p)});
+  const done=T.members.filter(m=>(byMember[m.id]||[]).some(p=>p.state==='submitted'&&p.f===S.fp)).length;
+  $('#view-status').innerHTML=`
+  <div class="panel"><div class="panel-h"><h2>Who has scored</h2><span class="badge ${done===T.members.length?'ok':'grey'}">${done} of ${T.members.length} submitted</span></div>
+   ${R.example?'<p class="muted">The example was scored as one agreed set from the video, so no individual founders are listed.</p>':''}
+   <div class="list">${T.members.map(m=>{const p=byMember[m.id]||[];const sub=p.find(x=>x.state==='submitted');const stale=sub&&sub.f!==S.fp;
+     const st=stale?'<span class="badge warn">Must score again (setup changed)</span>':sub?'<span class="badge ok">Submitted</span>':p.length?'<span class="badge">Scoring now</span>':'<span class="badge grey">Not started</span>';
+     return `<div class="item"><span class="dot" style="background:${col(m.id)}"></span><span class="grow"><b>${esc(m.name)}</b>${p.length>1?' <span class="badge warn">chosen on '+p.length+' devices</span>':''}</span>${st}</div>`}).join('')}</div></div>
+  <div class="panel"><div class="panel-h"><h2>${R.revealed?'Scores are revealed':'Reveal'}</h2></div>
+   ${R.revealed?`<p>Everyone can now see the results. ${fac?'If the team wants a second round after discussing the disagreements, hide the scores to reopen scoring. Founders keep their previous numbers and can adjust them.':'Only the facilitator can reopen scoring.'}</p>
+     ${fac&&!R.example?'<div class="row"><button class="btn danger" type="button" id="hideBtn">Hide scores and reopen scoring</button></div>':''}`
+   :fac?`<p>Reveal when everyone has submitted. All scores become visible at once, and they are locked until you reopen scoring.</p>
+     ${ui.confirmReveal?`<div class="callout warn"><p>${T.members.length-done} ${T.members.length-done===1?'person has':'people have'} not submitted yet. Reveal anyway?</p><div class="row" style="margin-top:8px"><button class="btn primary small" type="button" id="revealYes">Reveal now</button><button class="btn small" type="button" id="revealNo">Wait</button></div></div>`
+      :`<div class="row"><button class="btn primary" type="button" id="revealBtn">Reveal all scores</button></div>`}`
+   :'<p class="muted">Waiting for the facilitator to reveal the scores. Results appear for everyone at the same moment.</p>'}
   </div>`;
-  $('#addCodes').addEventListener('click',()=>{const parts=$('#pasteCodes').value.split(/\s+/).filter(Boolean);let ok=0,bad=0,stale=0;const fp=fingerprint();
-    for(const p of parts){try{if(!p.startsWith('SC1.'))throw 0;const d=dec(p.slice(4));if(d.f!==fp){stale++;continue}addSet(d);ok++}catch(e){bad++}}
-    renderCombine();$('#addMsg').textContent=[ok&&ok+' added',stale&&stale+' from a different team setup',bad&&bad+' not readable'].filter(Boolean).join(' · ')||'Nothing to add'});
-  document.querySelectorAll('[data-rm]').forEach(b=>b.addEventListener('click',()=>{S.sets.splice(+b.dataset.rm,1);save();renderCombine()}));}
+  const rv=$('#revealBtn');if(rv)rv.addEventListener('click',()=>{if(done<T.members.length){ui.confirmReveal=true;renderStatus()}else reveal(true)});
+  const ry=$('#revealYes');if(ry)ry.addEventListener('click',()=>reveal(true));const rn=$('#revealNo');if(rn)rn.addEventListener('click',()=>{ui.confirmReveal=false;renderStatus()});
+  const hb=$('#hideBtn');if(hb)hb.addEventListener('click',()=>reveal(false))}
+async function reveal(on){ui.confirmReveal=false;await W({revealed:on});toast(on?'Scores revealed':'Scoring reopened');if(on)setTimeout(()=>setTab('results'),300)}
 
-/* ---------------- 4. results ---------------- */
-function renderResults(){const T=S.team;const box=$('#view-results');
-  if(!S.sets.length){box.innerHTML=`<div class="panel"><h2>No scores yet</h2><p class="muted">Results appear once at least one score set is added. Score on this device or paste codes under Combine scores.</p></div>`;return}
+/* ===================== 4. results ===================== */
+function renderResults(){const T=S.team;const box=$('#view-results');const ps=participants();
+  if(!R.revealed){const n=ps.filter(p=>p.state==='submitted').length;box.innerHTML=`<div class="panel"><h2>Results are sealed</h2><p class="muted">${n} of ${T.members.length} founders have submitted. Results appear for everyone when the facilitator reveals the scores.</p></div>`;return}
+  if(!SCORES_LOADED){box.innerHTML='<div class="panel"><p class="muted">Loading scores…</p></div>';return}
+  if(!S.sets.length){box.innerHTML=`<div class="panel"><h2>No usable scores</h2><p class="muted">${S.stale?'All submitted scores were made for an earlier setup. Reopen scoring so everyone can score the current setup.':'Nobody had submitted when the scores were revealed. Reopen scoring under Status & reveal.'}</p></div>`;return}
   const A=averaged();const r=shapley(A.solo,A.syn);const sh=shares(r.phi,r.total);const n=T.members.length;const pot=100-T.pool;
-  const order=[...T.members].sort((a,b)=>r.phi[b.id]-r.phi[a.id]);
-  const maxPhi=Math.max(...order.map(m=>r.phi[m.id]),1);
+  const order=[...T.members].sort((a,b)=>r.phi[b.id]-r.phi[a.id]);const maxPhi=Math.max(...order.map(m=>r.phi[m.id]),1);
   const negatives=T.members.filter(m=>r.phi[m.id]<=0);
-  // disagreement flags
   const flags=[];if(S.sets.length>1){T.members.forEach(m=>{const s=A.spread['s'+m.id];if(s.n>1&&s.max-s.min>=Math.max(5,0.5*Math.abs(s.avg)))flags.push({what:m.name+' (solo)',...s})});
     T.groups.forEach(g=>{const s=A.spread['g'+g.id];if(s.n>1&&s.max-s.min>=Math.max(5,0.5*Math.abs(s.avg)))flags.push({what:gName(g),...s})});flags.sort((a,b)=>(b.max-b.min)-(a.max-a.min))}
   const per=S.sets.map(x=>{const so={},sy={};T.members.forEach(m=>so[m.id]=Number.isFinite(x.solo[m.id])?x.solo[m.id]:A.solo[m.id]);T.groups.forEach(g=>sy[g.id]=Number.isFinite(x.syn[g.id])?x.syn[g.id]:A.syn[g.id]);const rr=shapley(so,sy);return{by:x.by,sh:shares(rr.phi,rr.total)}});
   const cc=crossCheck(A.solo,A.syn);const maxDiff=cc?Math.max(...T.members.map((m,i)=>Math.abs(cc.phi[i]-r.phi[m.id]))):null;
-  const inputs=n+T.groups.length;const coal=Math.pow(2,n)-1;
+  const missing=T.members.filter(m=>!S.sets.some(s=>s.byId===m.id));
   box.innerHTML=`
-  ${S.example?`<div class="callout">This is the <b>LoopBox example</b> from the course video, scored as one agreed set. Use <b>Start a new team</b> to run your own.</div>`:''}
+  ${S.example?`<div class="callout">This is the <b>LoopBox example</b> from the course video, scored as one agreed set. Create your own team on the start page to run private scoring.</div>`:''}
+  ${!S.example&&missing.length?`<div class="callout warn">Averaged without ${missing.map(m=>esc(m.name)).join(', ')}, who did not submit before the reveal.</div>`:''}
+  ${S.stale?`<div class="callout warn">${S.stale} score set${S.stale>1?'s were':' was'} made for an earlier setup and ${S.stale>1?'are':'is'} left out.</div>`:''}
   <div class="panel">
    <div class="panel-h"><h2>${esc(T.name)}: founder equity</h2><span class="muted">Averaged over ${S.sets.length} score set${S.sets.length>1?'s':''} · ${T.pool}% option pool</span></div>
    <div class="stack" role="img" aria-label="Equity split">${order.map(m=>`<div style="flex:${Math.max(0,sh[m.id])};background:${col(m.id)}">${sh[m.id]>=7?esc(m.name)+' '+fmt(sh[m.id])+'%':''}</div>`).join('')}<div style="flex:${T.pool};background:#8E99AB">${T.pool>=7?'Pool '+T.pool+'%':''}</div></div>
    ${r.total<=0?`<div class="callout warn">The scores add up to ${fmt(r.total,0)} points in total, so there is nothing to split. Check for large negative synergies.</div>`:''}
-   ${negatives.length&&r.total>0?`<div class="callout warn">${negatives.map(m=>esc(m.name)).join(', ')} ${negatives.length>1?'come':'comes'} out at zero or below. That happens when negative synergies outweigh their solo value. Discuss it before using these numbers.</div>`:''}
+   ${negatives.length&&r.total>0?`<div class="callout warn">${negatives.map(m=>esc(m.name)).join(', ')} ${negatives.length>1?'come':'comes'} out at zero or below, because negative synergies outweigh their solo value. Discuss it before using these numbers.</div>`:''}
    <div class="tbl-wrap"><table>
     <thead><tr><th>Person</th><th class="r">Shapley points</th><th style="width:34%"></th><th class="r">Equity</th><th class="r">Equal split</th></tr></thead>
     <tbody>${order.map(m=>`<tr><td><span class="row" style="gap:8px"><span class="dot" style="background:${col(m.id)}"></span><b>${esc(m.name)}</b></span></td>
@@ -342,11 +437,9 @@ function renderResults(){const T=S.team;const box=$('#view-results');
   </div>
   <div class="grid2">
    <div class="panel"><div class="panel-h"><h3>Where each share comes from</h3></div>
-    <label class="lbl" for="decomp">Show</label>
-    <select id="decomp">${order.map(m=>`<option value="${m.id}">${esc(m.name)}</option>`).join('')}</select>
-    <div id="decompOut"></div></div>
+    <label class="lbl" for="decomp">Show</label><select id="decomp">${order.map(m=>`<option value="${m.id}">${esc(m.name)}</option>`).join('')}</select><div id="decompOut"></div></div>
    <div class="panel"><div class="panel-h"><h3>Where scorers disagree</h3><span class="muted">${S.sets.length>1?flags.length+' flagged':'Needs 2+ score sets'}</span></div>
-    ${S.sets.length<2?'<p class="muted">Once several founders send codes, items with widely different scores appear here. Talk those through first: they move the split most.</p>':
+    ${S.sets.length<2?'<p class="muted">With several founders, items with widely different scores appear here. Talk those through first: they move the split most.</p>':
      flags.length?`<div class="list">${flags.slice(0,8).map(f=>`<div class="item"><span class="grow"><b>${esc(f.what)}</b></span><span class="num">${fmt(f.min,0)} – ${fmt(f.max,0)}</span><span class="badge warn">avg ${fmt(f.avg)}</span></div>`).join('')}</div>`:'<div class="callout ok">No large disagreements. Every item is within a reasonable range across scorers.</div>'}
    </div>
   </div>
@@ -356,44 +449,36 @@ function renderResults(){const T=S.team;const box=$('#view-results');
    <tr><td style="font-family:var(--body)"><b>Average</b></td>${order.map(m=>`<td class="r"><b>${fmt(sh[m.id])}%</b></td>`).join('')}</tr></tbody></table></div></div>`:''}
   <div class="panel"><div class="panel-h"><h3>Computation check</h3><span class="badge ok">${cc&&maxDiff<1e-9?'Verified':'Shortcut only'}</span></div>
    <div class="row" style="gap:28px">
-    <div class="stat"><span class="muted">Scores entered per founder</span><b>${inputs}</b></div>
-    <div class="stat"><span class="muted">Coalitions a full table needs</span><b>${coal.toLocaleString()}</b></div>
-    <div class="stat"><span class="muted">Joining orders covered</span><b>${factStr(n)}</b></div>
-   </div>
-   <p class="muted">${cc?`The app rebuilt all ${cc.coalitions.toLocaleString()} coalition values from your scores and ran the textbook Shapley formula in ${fmt(cc.ms,1)} ms. Largest difference from the shortcut: ${maxDiff<1e-9?'0 (identical)':maxDiff.toExponential(2)}.`:`With ${n} people the full table would have ${coal.toLocaleString()} coalitions, so the app uses the exact shortcut only. It gives the same answer as the full formula.`}</p>
-  </div>`;
+    <div class="stat"><span class="muted">Scores entered per founder</span><b>${n+T.groups.length}</b></div>
+    <div class="stat"><span class="muted">Coalitions a full table needs</span><b>${(Math.pow(2,n)-1).toLocaleString()}</b></div>
+    <div class="stat"><span class="muted">Joining orders covered</span><b>${factStr(n)}</b></div></div>
+   <p class="muted">${cc?`The app rebuilt all ${cc.coalitions.toLocaleString()} coalition values from the scores and ran the textbook Shapley formula in ${fmt(cc.ms,1)} ms. Largest difference from the shortcut: ${maxDiff<1e-9?'0 (identical)':maxDiff.toExponential(2)}.`:`With ${n} people the full table would have ${(Math.pow(2,n)-1).toLocaleString()} coalitions, so the app uses the exact shortcut only. It gives the same answer as the full formula.`}</p></div>`;
   const dsel=$('#decomp');const drawD=()=>{const id=dsel.value;const p=r.parts[id].filter(x=>Math.abs(x.v)>1e-9);const pos=p.filter(x=>x.v>0);const tot=pos.reduce((a,b)=>a+b.v,0)||1;
     $('#decompOut').innerHTML=`<div class="stack" role="img" aria-label="Breakdown of ${esc(nameOf(id))}'s points">${pos.map(x=>`<div style="flex:${x.v};background:${x.label==='solo'?col(id):'var(--accent)'};opacity:${x.label==='solo'?1:.75}">${x.v/tot>=.12?fmt(x.v):''}</div>`).join('')}</div>
      <div class="list" style="margin-top:6px">${p.map(x=>`<div class="item"><span class="grow">${x.label==='solo'?'Solo value':esc(x.label)}</span><span class="num">${x.v>=0?'+':''}${fmt(x.v)}</span></div>`).join('')}
      <div class="item"><span class="grow"><b>Shapley points</b></span><span class="num"><b>${fmt(r.phi[id])}</b></span></div></div>`};
-  dsel.addEventListener('change',drawD);drawD();}
-function factStr(n){if(n>20)return n+'!';let f=1;for(let i=2;i<=n;i++)f*=i;return f.toLocaleString()}
+  dsel.addEventListener('change',drawD);drawD()}
 
-/* ---------------- method ---------------- */
+/* ===================== method ===================== */
 function renderMethod(){$('#view-method').innerHTML=`
   <div class="panel"><h2>How to compute coalitions efficiently</h2>
    <p>The textbook Shapley value asks for the worth of every possible group of founders, then averages each person's added value over every possible joining order. That grows fast:</p>
    <div class="tbl-wrap"><table><thead><tr><th>Team size</th><th class="r">Coalitions to score</th><th class="r">Joining orders</th></tr></thead><tbody>
     ${[3,5,8,10,15,20].map(n=>`<tr><td class="num">${n}</td><td class="r num">${(Math.pow(2,n)-1).toLocaleString()}</td><td class="r num">${factStr(n)}</td></tr>`).join('')}</tbody></table></div>
-   <p>Nobody can score a thousand coalitions honestly. So the app uses three ideas:</p>
    <ol class="steps">
-    <li><b>Score building blocks, not coalitions.</b> Each person gets a solo value, and the team lists only the synergies it believes in. A coalition is worth the solo values of its members plus every synergy whose members are all inside it. In game theory these blocks are called Harsanyi dividends.</li>
-    <li><b>Use the exact shortcut.</b> With that model the Shapley value has a closed form, so no orders need to be simulated:
+    <li><b>Score building blocks, not coalitions.</b> Each person gets a solo value, and the team lists only the synergies it believes in. A coalition is worth its members' solo values plus every synergy whose members are all inside it. In game theory these blocks are called Harsanyi dividends.</li>
+    <li><b>Use the exact shortcut.</b> With that model the Shapley value has a closed form:
      <div class="formula" style="margin-top:8px">Shapley(i) = solo(i) + Σ over synergies G that include i of value(G) ÷ size(G)</div>
      Each synergy is shared equally among the people who create it. The work grows with the number of scores entered, so a 30-person team computes as fast as a 3-person one.</li>
-    <li><b>Average the inputs, not the arguments.</b> The Shapley value is linear, so averaging every founder's scores and then splitting gives exactly the average of their individual splits. That is why private scoring followed by averaging is fair to everyone.</li>
+    <li><b>Average the inputs, not the arguments.</b> The Shapley value is linear, so averaging every founder's scores and then splitting gives exactly the average of their individual splits.</li>
+    <li><b>Seal the scores until everyone is done.</b> Seeing someone else's numbers first anchors your own. The database only releases the scores once the facilitator reveals them.</li>
    </ol>
-   <p>For teams of up to 14 people, the Results tab also rebuilds the full coalition table and runs the textbook formula (about n × 2ⁿ steps) to confirm the shortcut. For games that cannot be written as building blocks, the usual approach is to sample a few thousand random joining orders and average them (Monte Carlo estimation).</p>
-  </div>
+   <p>For teams of up to 14 people, Results also rebuilds the full coalition table and runs the textbook formula (about n × 2ⁿ steps) to confirm the shortcut.</p></div>
   <div class="panel"><h3>Before you sign anything</h3>
    <p>Scores are assumptions, not evidence. Treat the split as the start of the conversation. Agree vesting, typically four years with a one-year cliff starting on each person's first day. Then ask a lawyer to turn the numbers into a shareholders' agreement.</p></div>`}
 
-/* ---------------- boot ---------------- */
-$('#btnExample').addEventListener('click',()=>{S=example();ui={tab:'results',scorer:null,draft:null,sel:[]};save();header();setTab('results');toast('LoopBox example loaded')});
-$('#btnNew').addEventListener('click',()=>{S={team:{name:'My team',pool:10,members:[{id:uid('m'),name:'Founder 1'},{id:uid('m'),name:'Founder 2'},{id:uid('m'),name:'Founder 3'}],groups:[]},sets:[],example:false};ui={tab:'setup',scorer:null,draft:null,sel:[]};save();header();setTab('setup');toast('New team started')});
-header();
-const h=(location.hash||'').slice(1);setTab(['setup','score','combine','results','method'].includes(h)?h:'results');
+const RENDER={setup:renderSetup,score:renderScore,status:renderStatus,results:renderResults,method:renderMethod};
+route();
 </script>
-
 </body>
 </html>

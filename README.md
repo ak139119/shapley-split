@@ -1,63 +1,66 @@
-# Shapley Split
+# Shapley Split (live)
 
-A one-page web app for splitting founder equity fairly with Shapley values. Each founder privately scores their teammates' solo value and the synergies between them. The app averages the scores, flags disagreements and computes the split. It works for teams of any size.
+Split founder equity fairly with Shapley values, scored by the whole team in real time.
 
-Built for **Business Modeling · Session 5: Team Architecture & Agentic AI Workflows**. It opens on the LoopBox example from the course video.
+- **Facilitator:** creates the team, lists the founders and their synergies, and shares one team link.
+- **Each founder:** opens the link on their own device, chooses their name and scores **in private**.
+- **Sealed scores:** nobody, the facilitator included, can see anyone's numbers until the facilitator clicks **Reveal all scores**. The database enforces this, not just the screen.
+- **After the reveal:** everyone sees the split, a breakdown of each share, the items where scorers disagreed most, and each scorer's own implied split. The facilitator can **reopen scoring** for a second round after the discussion.
+- **Teams of any size:** the app uses the exact Shapley shortcut. For teams of up to 14 it also checks the result against the full textbook formula.
 
-- **One file:** `index.html`. No build step, no server, no database.
-- **Private by design:** scores stay in each student's browser and leave it only as a "score code" the student chooses to send.
+It opens with the **LoopBox example** from the course video (Alex 28.8%, Sam 27.0%, Jordan 14.4%, Casey 11.7%, Taylor 8.1%, pool 10%).
 
----
-
-## Publish it on GitHub Pages (about 10 minutes, no coding)
-
-### 1. Create a repository
-1. Sign in at [github.com](https://github.com), or create a free account.
-2. Click **+** (top right) → **New repository**.
-3. **Repository name:** `shapley-split`. This becomes part of the web address.
-4. Choose **Public**. GitHub Pages is free for public repositories; private ones need a paid plan. The file contains no student or personal data.
-5. Click **Create repository**.
-
-### 2. Upload the files
-1. On the new repository page, click **uploading an existing file**, or use **Add file → Upload files**.
-2. Drag in `index.html` and this `README.md`. Keep the name `index.html` exactly.
-3. Click **Commit changes**.
-
-### 3. Turn on GitHub Pages
-1. Open the repository's **Settings** tab → **Pages** (left sidebar).
-2. Under **Build and deployment**, set **Source** to **Deploy from a branch**.
-3. Set **Branch** to `main` and the folder to `/ (root)`, then click **Save**.
-4. Wait one to two minutes and refresh the page. The address appears at the top:
-   `https://YOUR-USERNAME.github.io/shapley-split/`
-
-### 4. Check it works
-Open the address. The page should load the LoopBox example with Alex 28.8%, Sam 27.0%, Jordan 14.4%, Casey 11.7%, Taylor 8.1% and a 10% pool. The **Computation check** panel should say **Verified**.
+**Files**
+- `index.html`: the whole app.
+- `firestore.rules`: database rules for **both** this app and the Negotiation Planner.
+- `README.md`: these notes.
 
 ---
 
-## Link it from Moodle
-1. In your course, turn editing on → **Add an activity or resource** → **URL**.
-2. Paste the GitHub Pages address.
-3. Under **Appearance → Display**, choose **New window**. The copy buttons work more reliably outside an embedded frame.
+## Without setup
+Opened as it is, the app runs in **This device only** mode. Founders take turns on one laptop, and each person's numbers disappear as soon as they submit. This is fine for a small group around one table.
 
-You can also link straight to a step by adding it to the end of the address:
-- `…/shapley-split/#setup` opens **Set up the team**.
-- `#score`, `#combine`, `#results` and `#method` open the other tabs.
+## Live mode: if you already set up the Negotiation Planner
+You can use the same Firebase project.
+1. Open `index.html` in a text editor and paste the **same four values** (`apiKey`, `authDomain`, `projectId`, `appId`) into the `window.FIREBASE_CONFIG` block near the top.
+2. In Firebase, go to **Firestore Database → Rules**. Replace everything with the contents of this folder's `firestore.rules` and click **Publish**. This file covers both apps, so the Negotiation Planner keeps working.
+3. Publish on GitHub Pages in a new repository, for example `shapley-split`: upload the three files, then **Settings → Pages → Deploy from a branch → main / (root) → Save**.
+4. In Firebase, go to **Authentication → Settings → Authorized domains**. Your `YOUR-USERNAME.github.io` domain is already there from the planner; if not, add it.
 
-## How students use it in class
-1. **Facilitator** (one per team): clicks **Start a new team** → **Set up the team**, adds the people and synergies, then copies the **setup code** to the team chat.
-2. **Each founder**: opens the link → **Score privately** → pastes the setup code → chooses their name → scores alone → **Create my score code** → sends it to the facilitator.
-3. **Facilitator**: **Combine scores** → pastes all the score codes → **Results**. Discuss the flagged disagreements before agreeing the split.
+## Live mode: setting up Firebase for the first time
+Follow steps 1–4 and 7 of the Negotiation Planner README:
+1. Create a project.
+2. Register a web app and copy its four settings.
+3. Turn on **Anonymous** sign-in.
+4. Create a Firestore database in a European location and paste in the rules from this folder.
+5. Add your GitHub Pages domain to **Authorized domains**.
 
-Codes are plain text, so any channel works: email, Teams, WhatsApp or the Moodle forum. If the facilitator changes the people or the synergies after scoring has started, the old score codes no longer match. Re-send the setup code and score again.
+Then do steps 1 and 3 above.
 
-## Updating the app
-Upload a new `index.html` with the same name (**Add file → Upload files** → **Commit changes**). The site updates within a couple of minutes. If you still see the old version, refresh with **Ctrl+Shift+R** (or **⌘+Shift+R** on a Mac).
+## Test it before class
+1. Open your GitHub Pages address. The badge should say **Live sync on**.
+2. Click **Create team**, tick **Start from the LoopBox setup**, then **Copy team link**.
+3. Open the link in a **different browser**, or a private window, or on your phone. The same browser shares one identity, so two tabs count as one person.
+4. In the second browser, choose a name and submit scores. In the first browser, **Status & reveal** should show that person as **Submitted**, while **Results** stays sealed.
+5. Click **Reveal all scores**. Both browsers show the results at the same moment.
 
-## Optional: your own domain
-In **Settings → Pages → Custom domain**, enter something like `shapley.yourdomain.com` and save. At your domain provider, add a **CNAME** record pointing that name to `YOUR-USERNAME.github.io`. When the check passes, tick **Enforce HTTPS**.
+---
 
-## Privacy notes
-- **No accounts, no tracking, no server-side storage.** The team setup and scores are saved only in the browser's local storage on each device. Clearing browser data removes them, so students should keep their codes.
-- **Fonts.** The page loads its fonts from Google Fonts (`fonts.googleapis.com`), which shares the visitor's IP address with Google. If your institution's data-protection policy requires it, the fonts can be bundled into the repository instead, or the page can fall back to system fonts with no external requests.
-- **Not legal advice.** The output is a structured starting point for a founders' conversation, not a legal allocation. Agree vesting, and have a lawyer draft the shareholders' agreement.
+## Running it in class
+1. **Facilitator** (one per team): **Create team** → **Set up the team**. Add the founders and the synergies (pairs, or trios when value only appears with all three), set the option pool, and copy the team link to the team chat.
+2. **Each founder**: open the link → **Score privately** → choose your name → score alone → **Submit my scores**. Scores can be changed until the reveal.
+3. **Facilitator**: watch **Status & reveal**. When everyone has submitted, click **Reveal all scores**.
+4. **Discuss** the items under *Where scorers disagree* first. If the team wants, the facilitator clicks **Hide scores and reopen scoring** for a second round. Everyone keeps their previous numbers and can adjust them.
+
+**Good to know**
+- **The facilitator is tied to the browser that created the team.** Use the same browser and device to reveal. If that browser's data is cleared, the facilitator controls are lost, and the simplest fix is to create the team again.
+- **Changing the setup after scoring has started** (adding a person or a synergy) means everyone must score again. Old scores are flagged and left out of the results automatically.
+- **Results average only what was submitted before the reveal.** Anyone missing is named at the top of the results.
+- **Anyone with the team link can join as a team member.** Keep links inside the team.
+
+## Free-tier limits and privacy
+- Each team uses a few hundred database reads and writes per session, well within Firebase's free plan for a whole class.
+- The database stores the team setup, each founder's chosen name and their scores. There are no emails or passwords.
+- Choose a European Firestore location to keep data in the EU.
+- The page loads fonts from Google Fonts. A version with bundled fonts is available if your institution prefers no outside requests.
+- To delete a team, remove it in the Firebase console under **Firestore Database → Data → shapley**.

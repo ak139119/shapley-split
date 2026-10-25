@@ -1,0 +1,62 @@
+rules_version = '2';
+// Security rules for BOTH course apps: Negotiation Planner (collection "plans")
+// and Shapley Split (collection "shapley"). Paste this whole file into
+// Firebase → Firestore Database → Rules, replacing what is there.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+
+    // ---------------- Negotiation Planner ----------------
+    function validPlan() {
+      return request.resource.data.keys().hasOnly(
+        ['v', 'meta', 'fields', 'rows', 'owners', 'zopa', 'presence', 'updatedAt']);
+    }
+    match /plans/{planId} {
+      allow get: if signedIn();
+      allow create: if signedIn() && planId.matches('^[A-Za-z0-9]{20,40}$') && validPlan();
+      allow update: if signedIn() && validPlan();
+      allow list, delete: if false;
+    }
+
+    // ---------------- Shapley Split ----------------
+    function validTeam() {
+      return request.resource.data.keys().hasOnly(
+        ['v', 'team', 'owner', 'revealed', 'submitted', 'updatedAt']);
+    }
+    match /shapley/{teamId} {
+      allow get: if signedIn();
+      // The person who creates a team becomes its facilitator ("owner").
+      allow create: if signedIn()
+                    && teamId.matches('^[A-Za-z0-9]{20,40}$')
+                    && validTeam()
+                    && request.resource.data.owner == request.auth.uid
+                    && request.resource.data.revealed == false;
+      // The facilitator can change anything except ownership.
+      // Everyone else can only add or update their own entry in "submitted".
+      allow update: if signedIn() && validTeam()
+                    && request.resource.data.owner == resource.data.owner
+                    && (request.auth.uid == resource.data.owner
+                        || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['submitted', 'updatedAt'])
+                            && request.resource.data.submitted.diff(resource.data.submitted).affectedKeys().hasOnly([request.auth.uid])));
+      allow list, delete: if false;
+
+      // Each founder's scores. Sealed: readable only by their author until the
+      // facilitator reveals; editable only while scoring is open.
+      match /scores/{uid} {
+        function teamDoc() { return get(/databases/$(database)/documents/shapley/$(teamId)).data; }
+        allow get: if signedIn() && (request.auth.uid == uid || teamDoc().revealed == true);
+        allow list: if signedIn() && teamDoc().revealed == true;
+        allow create, update: if signedIn() && request.auth.uid == uid
+                              && teamDoc().revealed == false
+                              && request.resource.data.keys().hasOnly(['memberId', 'by', 'f', 't', 'solo', 'syn']);
+        allow delete: if false;
+      }
+    }
+
+    // Everything else is closed.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
