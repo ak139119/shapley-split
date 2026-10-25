@@ -1,0 +1,399 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="Split founder equity fairly with Shapley values: founders score solo value and synergies privately, the app averages the scores and computes the split.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%231F5FA8'/%3E%3Cpath d='M16 16V5a11 11 0 0 1 11 11z' fill='%23fff'/%3E%3Cpath d='M16 16h11A11 11 0 1 1 16 5z' fill='%23fff' opacity='.55'/%3E%3C/svg%3E">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>Shapley Split</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,600;8..60,700&display=swap">
+<style>
+/* Layout: one working column (max 1080px) — tabs across the top, each step a stack of ledger-style panels. */
+:root{
+  --bg:#F3F5F8; --panel:#FFFFFF; --ink:#15213A; --muted:#536079; --line:#D9DFE8; --soft:#EBEFF5;
+  --accent:#1F5FA8; --accent-ink:#FFFFFF; --accent-soft:#E4EDF8;
+  --ok:#1C7A4E; --ok-soft:#E2F2E9; --warn:#A8460E; --warn-soft:#FBEBDF; --bad:#B42335;
+  --display:"Source Serif 4",Georgia,serif; --body:"IBM Plex Sans",system-ui,sans-serif; --mono:"IBM Plex Mono",ui-monospace,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0F1522; --panel:#172033; --ink:#E6ECF5; --muted:#A3B0C6; --line:#2B3852; --soft:#1E2A40;
+  --accent:#7FB0EC; --accent-ink:#0F1522; --accent-soft:#1D3150;
+  --ok:#6BC79A; --ok-soft:#173A2A; --warn:#F0A570; --warn-soft:#3C2617; --bad:#F2818F; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0F1522; --panel:#172033; --ink:#E6ECF5; --muted:#A3B0C6; --line:#2B3852; --soft:#1E2A40;
+  --accent:#7FB0EC; --accent-ink:#0F1522; --accent-soft:#1D3150;
+  --ok:#6BC79A; --ok-soft:#173A2A; --warn:#F0A570; --warn-soft:#3C2617; --bad:#F2818F; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font:15px/1.5 var(--body);padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:28px 64px}
+.wrap{max-width:1080px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
+h1,h2,h3{font-family:var(--display);margin:0;line-height:1.15;text-wrap:balance}
+h1{font-size:clamp(30px,4.4vw,42px)}
+h2{font-size:24px}
+h3{font-size:18px}
+p{margin:0}
+.muted{color:var(--muted)}
+.mono,.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+header.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:16px}
+header.top .sub{max-width:62ch;color:var(--muted);margin-top:6px}
+.badge{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;font-size:12.5px;font-weight:600;letter-spacing:.02em;background:var(--accent-soft);color:var(--accent)}
+.badge.warn{background:var(--warn-soft);color:var(--warn)}
+.badge.ok{background:var(--ok-soft);color:var(--ok)}
+nav.tabs{display:flex;gap:4px;padding:4px;background:var(--soft);border-radius:12px;overflow-x:auto}
+nav.tabs button{flex:1 0 auto;border:0;background:transparent;color:var(--muted);font:600 14px var(--body);padding:10px 14px;border-radius:9px;cursor:pointer;display:flex;align-items:center;gap:8px;white-space:nowrap}
+nav.tabs button .n{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-size:12px;background:var(--panel);color:var(--muted)}
+nav.tabs button[aria-selected="true"]{background:var(--panel);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+nav.tabs button[aria-selected="true"] .n{background:var(--accent);color:var(--accent-ink)}
+nav.tabs button:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px 22px;display:flex;flex-direction:column;gap:14px;min-width:0}
+.panel-h{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:8px 16px}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:20px}
+label.lbl{font-size:12.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+input[type=text],input[type=number],select,textarea{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px;min-width:0}
+input[type=number]{font-family:var(--mono);width:96px;text-align:right}
+textarea{width:100%;font-family:var(--mono);font-size:12.5px;min-height:84px;resize:vertical}
+.btn{font:600 14px var(--body);border-radius:9px;padding:9px 14px;cursor:pointer;border:1px solid var(--line);background:var(--panel);color:var(--ink);display:inline-flex;align-items:center;gap:8px}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn.ghost{background:transparent}
+.btn.small{padding:5px 10px;font-size:13px}
+.btn[disabled]{opacity:.5;cursor:not-allowed}
+.row{display:flex;flex-wrap:wrap;align-items:center;gap:10px}
+.dot{width:12px;height:12px;border-radius:4px;flex:none}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border-radius:999px;border:1px solid var(--line);background:var(--bg);font-size:13.5px;font-weight:500;cursor:pointer;color:var(--ink)}
+.chip[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent);color:var(--ink)}
+.list{display:flex;flex-direction:column}
+.item{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;padding:10px 0;border-top:1px solid var(--line)}
+.item:first-child{border-top:0}
+.item .grow{flex:1 1 180px;min-width:0}
+.tbl-wrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;min-width:520px}
+th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:middle}
+th{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600}
+td.r,th.r{text-align:right}
+.bar{height:12px;border-radius:6px;background:var(--soft);overflow:hidden;min-width:80px}
+.bar>i{display:block;height:100%;border-radius:6px}
+.stack{display:flex;height:34px;border-radius:8px;overflow:hidden;gap:2px}
+.stack>div{display:flex;align-items:center;justify-content:center;color:#fff;font:600 12.5px var(--mono);min-width:0;overflow:hidden;white-space:nowrap}
+.stat{display:flex;flex-direction:column;gap:2px}
+.stat b{font:600 26px var(--mono)}
+.callout{border-radius:10px;padding:12px 14px;background:var(--soft);font-size:14px}
+.callout.warn{background:var(--warn-soft)}
+.callout.ok{background:var(--ok-soft)}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;font-weight:600;font-size:14px;z-index:20}
+.formula{font-family:var(--mono);background:var(--soft);border-radius:8px;padding:10px 12px;font-size:13.5px;overflow-x:auto;white-space:nowrap}
+ol.steps{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:8px}
+.cmp td{font-family:var(--mono)}
+section[role=tabpanel]{display:flex;flex-direction:column;gap:20px}
+@media (prefers-reduced-motion:no-preference){.bar>i{transition:width .35s ease}}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header class="top">
+    <div>
+      <div class="row"><span class="badge">Business Modeling · Session 5</span><span class="badge" id="teamBadge">Team</span></div>
+      <h1 style="margin-top:10px">Shapley Split</h1>
+      <p class="sub">Score each founder's solo value and the synergies between them. The app averages everyone's scores and splits the founder equity by Shapley value. It works for teams of any size.</p>
+    </div>
+    <div class="row">
+      <button class="btn ghost small" id="btnExample" type="button">Load LoopBox example</button>
+      <button class="btn ghost small" id="btnNew" type="button">Start a new team</button>
+    </div>
+  </header>
+
+  <nav class="tabs" role="tablist" aria-label="Steps">
+    <button role="tab" id="tab-setup" aria-controls="view-setup" data-tab="setup"><span class="n">1</span>Set up the team</button>
+    <button role="tab" id="tab-score" aria-controls="view-score" data-tab="score"><span class="n">2</span>Score privately</button>
+    <button role="tab" id="tab-combine" aria-controls="view-combine" data-tab="combine"><span class="n">3</span>Combine scores</button>
+    <button role="tab" id="tab-results" aria-controls="view-results" data-tab="results"><span class="n">4</span>Results</button>
+    <button role="tab" id="tab-method" aria-controls="view-method" data-tab="method"><span class="n">?</span>How it computes</button>
+  </nav>
+
+  <section id="view-setup" role="tabpanel" aria-labelledby="tab-setup" hidden></section>
+  <section id="view-score" role="tabpanel" aria-labelledby="tab-score" hidden></section>
+  <section id="view-combine" role="tabpanel" aria-labelledby="tab-combine" hidden></section>
+  <section id="view-results" role="tabpanel" aria-labelledby="tab-results" hidden></section>
+  <section id="view-method" role="tabpanel" aria-labelledby="tab-method" hidden></section>
+</div>
+
+<script>
+/* ---------------- state ---------------- */
+const COLORS=['#1F5FA8','#0E6B5C','#C08A2A','#7A4C9E','#B0460C','#2F7F9E','#9C3D6B','#5B7A1E','#6B5BD6','#8A6A4A','#2E5E8F','#B5651D'];
+function example(){return{
+  team:{name:'LoopBox',pool:10,
+    members:[{id:'alex',name:'Alex'},{id:'sam',name:'Sam'},{id:'jordan',name:'Jordan'},{id:'taylor',name:'Taylor'},{id:'casey',name:'Casey'}],
+    groups:[{id:'g1',members:['alex','sam'],note:'Vision + working product = fundable'},
+            {id:'g2',members:['sam','casey'],note:'Return-point data that actually runs'},
+            {id:'g3',members:['alex','jordan'],note:'Pitch + community'},
+            {id:'g4',members:['alex','casey'],note:'Handshakes into signed contracts'},
+            {id:'g5',members:['sam','taylor'],note:'Product that works at the return point'},
+            {id:'g6',members:['jordan','taylor'],note:'Design the campus loves'},
+            {id:'g7',members:['alex','sam','jordan'],note:'The trio that can launch'}]},
+  sets:[{by:'Video estimates',byId:'video',solo:{alex:10,sam:8,jordan:6,taylor:4,casey:4},syn:{g1:20,g2:10,g3:8,g4:8,g5:6,g6:4,g7:12}}],
+  example:true};}
+let S=load()||example();
+let ui={tab:'results',scorer:null,draft:null,sel:[]};
+function save(){try{localStorage.setItem('shapley-split-v1',JSON.stringify(S))}catch(e){}}
+function load(){try{const v=JSON.parse(localStorage.getItem('shapley-split-v1'));return v&&v.team?v:null}catch(e){return null}}
+const $=s=>document.querySelector(s);
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const uid=p=>p+Math.random().toString(36).slice(2,8);
+const col=id=>COLORS[Math.max(0,S.team.members.findIndex(m=>m.id===id))%COLORS.length];
+const nameOf=id=>(S.team.members.find(m=>m.id===id)||{name:'?'}).name;
+const gName=g=>g.members.map(nameOf).join(' + ');
+const fmt=(x,d=1)=>Number.isFinite(x)?x.toFixed(d):'–';
+function toast(msg){const t=document.createElement('div');t.className='toast';t.setAttribute('role','status');t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),2200)}
+function fingerprint(){const s=S.team.members.map(m=>m.id).join(',')+'|'+S.team.groups.map(g=>g.id+':'+g.members.join('.')).join(',');let h=0;for(const c of s)h=(h*31+c.charCodeAt(0))>>>0;return h.toString(36)}
+const enc=o=>btoa(unescape(encodeURIComponent(JSON.stringify(o)))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+const dec=s=>JSON.parse(decodeURIComponent(escape(atob(s.replace(/-/g,'+').replace(/_/g,'/')))));
+
+/* ---------------- maths ---------------- */
+// Average the scorers' inputs item by item (a blank counts as "no opinion", not zero).
+function averaged(){const solo={},syn={},spread={};const T=S.team;
+  const items=[...T.members.map(m=>['s',m.id]),...T.groups.map(g=>['g',g.id])];
+  for(const [k,id] of items){const vals=S.sets.map(x=>(k==='s'?x.solo:x.syn)[id]).filter(v=>Number.isFinite(v));
+    const avg=vals.length?vals.reduce((a,b)=>a+b,0)/vals.length:0;(k==='s'?solo:syn)[id]=avg;
+    spread[k+id]={n:vals.length,min:Math.min(...vals),max:Math.max(...vals),avg};}
+  return{solo,syn,spread};}
+// Shapley for a solo + synergy model: each person keeps their solo value and an equal share of every synergy they belong to.
+function shapley(solo,syn){const T=S.team;const phi={},parts={};let total=0;
+  T.members.forEach(m=>{phi[m.id]=solo[m.id]||0;parts[m.id]=[{label:'solo',v:solo[m.id]||0,color:col(m.id)}];total+=solo[m.id]||0});
+  T.groups.forEach(g=>{const v=syn[g.id]||0;total+=v;g.members.forEach(id=>{if(!(id in phi))return;phi[id]+=v/g.members.length;
+    parts[id].push({label:(g.members.length===2?'½':'1/'+g.members.length)+' of '+gName(g),v:v/g.members.length,gid:g.id})})});
+  return{phi,parts,total};}
+function shares(phi,total){const pot=100-S.team.pool;const out={};for(const id in phi)out[id]=total>0?phi[id]/total*pot:NaN;return out}
+// Cross-check: rebuild the full coalition table v(S) and run the textbook subset formula.
+function crossCheck(solo,syn){const T=S.team,n=T.members.length;if(n>14)return null;const t0=performance.now();
+  const idx={};T.members.forEach((m,i)=>idx[m.id]=i);const N=1<<n;const v=new Float64Array(N);
+  const gm=T.groups.map(g=>({mask:g.members.reduce((a,id)=>a|(1<<idx[id]),0),val:syn[g.id]||0}));
+  for(let s=1;s<N;s++){let x=0;for(let i=0;i<n;i++)if(s&(1<<i))x+=solo[T.members[i].id]||0;for(const g of gm)if((s&g.mask)===g.mask)x+=g.val;v[s]=x}
+  const fact=[1];for(let i=1;i<=n;i++)fact[i]=fact[i-1]*i;const pc=s=>{let c=0;while(s){s&=s-1;c++}return c};
+  const phi=new Array(n).fill(0);
+  for(let i=0;i<n;i++){const b=1<<i;for(let s=0;s<N;s++){if(s&b)continue;const k=pc(s);phi[i]+=fact[k]*fact[n-k-1]/fact[n]*(v[s|b]-v[s])}}
+  return{phi,coalitions:N-1,ms:performance.now()-t0}}
+
+/* ---------------- tabs ---------------- */
+function setTab(t){ui.tab=t;document.querySelectorAll('nav.tabs button').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.tab===t)));
+  ['setup','score','combine','results','method'].forEach(k=>{$('#view-'+k).hidden=k!==t});
+  ({setup:renderSetup,score:renderScore,combine:renderCombine,results:renderResults,method:renderMethod})[t]();
+  try{if(location.hash!=='#'+t)history.replaceState(null,'','#'+t)}catch(e){}}
+document.querySelectorAll('nav.tabs button').forEach(b=>b.addEventListener('click',()=>setTab(b.dataset.tab)));
+function header(){$('#teamBadge').textContent=(S.example?'Example · ':'')+S.team.name+' · '+S.team.members.length+' people'}
+
+/* ---------------- 1. setup ---------------- */
+function renderSetup(){const T=S.team;const n=T.members.length;
+  $('#view-setup').innerHTML=`
+  <div class="grid2">
+   <div class="panel">
+    <div class="panel-h"><h2>Team</h2><span class="muted">${n} people</span></div>
+    <div class="row"><label class="lbl" for="tName" style="min-width:110px">Team name</label><input type="text" id="tName" value="${esc(T.name)}" style="flex:1"></div>
+    <div class="row"><label class="lbl" for="tPool" style="min-width:110px">Option pool %</label><input type="number" id="tPool" min="0" max="50" step="1" value="${T.pool}"><span class="muted">Reserved for future hires. Shapley splits the other ${100-T.pool}%.</span></div>
+    <div class="list" id="memList">${T.members.map(m=>`<div class="item"><span class="dot" style="background:${col(m.id)}"></span>
+      <label class="sr" for="mn-${m.id}" hidden>Name</label><input type="text" id="mn-${m.id}" data-mname="${m.id}" value="${esc(m.name)}" class="grow" aria-label="Name of team member">
+      <button class="btn small ghost" type="button" data-mdel="${m.id}" ${n<=2?'disabled':''} aria-label="Remove ${esc(m.name)}">Remove</button></div>`).join('')}</div>
+    <div class="row"><input type="text" id="newMember" placeholder="Add a person" aria-label="New team member name" style="flex:1"><button class="btn" type="button" id="addMember">Add person</button></div>
+   </div>
+   <div class="panel">
+    <div class="panel-h"><h2>Synergies</h2><span class="muted">${T.groups.length} groups</span></div>
+    <p class="muted">List only the combinations that create value together. Pairs are most common. Add a trio or larger group when the value only appears with all of them.</p>
+    <div class="list">${T.groups.map(g=>`<div class="item"><div class="row grow" style="gap:6px">${g.members.map(id=>`<span class="dot" style="background:${col(id)}"></span>`).join('')}<b>${esc(gName(g))}</b></div>
+      <input type="text" data-gnote="${g.id}" value="${esc(g.note||'')}" placeholder="Why this works" aria-label="Why ${esc(gName(g))} creates value" style="flex:2 1 220px">
+      <button class="btn small ghost" type="button" data-gdel="${g.id}">Remove</button></div>`).join('')||'<p class="muted">No synergies yet. With none, Shapley simply pays each person their solo value.</p>'}</div>
+    <div class="callout"><div class="lbl" style="margin-bottom:8px">New synergy: pick 2 or more people</div>
+      <div class="row" id="pick">${T.members.map(m=>`<button type="button" class="chip" data-pick="${m.id}" aria-pressed="${ui.sel.includes(m.id)}"><span class="dot" style="background:${col(m.id)}"></span>${esc(m.name)}</button>`).join('')}</div>
+      <div class="row" style="margin-top:10px"><button class="btn" type="button" id="addGroup" ${ui.sel.length<2?'disabled':''}>Add synergy${ui.sel.length>=2?': '+esc(ui.sel.map(nameOf).join(' + ')):''}</button></div></div>
+   </div>
+  </div>
+  <div class="panel">
+    <div class="panel-h"><h2>Share the setup</h2><span class="muted">Everyone must score the same team</span></div>
+    <p>Send this code to every founder. They open this page, paste it under <b>Score privately</b>, and score on their own device.</p>
+    <textarea id="setupCode" readonly aria-label="Setup code">${'SS1.'+enc({team:S.team})}</textarea>
+    <div class="row"><button class="btn primary" type="button" id="copySetup">Copy setup code</button>
+      <span class="muted">${S.sets.length?`Changing people or synergies after scoring makes earlier score codes stop matching.`:''}</span></div>
+  </div>`;
+  const v=$('#view-setup');
+  $('#tName').addEventListener('input',e=>{S.team.name=e.target.value||'Team';S.example=false;save();header()});
+  $('#tPool').addEventListener('change',e=>{S.team.pool=Math.max(0,Math.min(50,Math.round(+e.target.value||0)));save();renderSetup()});
+  v.querySelectorAll('[data-mname]').forEach(i=>i.addEventListener('input',e=>{const m=S.team.members.find(x=>x.id===e.target.dataset.mname);m.name=e.target.value||'?';save();header()}));
+  v.querySelectorAll('[data-mname]').forEach(i=>i.addEventListener('change',()=>renderSetup()));
+  v.querySelectorAll('[data-mdel]').forEach(b=>b.addEventListener('click',()=>{const id=b.dataset.mdel;S.team.members=S.team.members.filter(m=>m.id!==id);
+    S.team.groups=S.team.groups.map(g=>({...g,members:g.members.filter(x=>x!==id)})).filter(g=>g.members.length>=2);ui.sel=ui.sel.filter(x=>x!==id);S.example=false;save();header();renderSetup()}));
+  const add=()=>{const nm=$('#newMember').value.trim();if(!nm)return;S.team.members.push({id:uid('m'),name:nm});S.example=false;save();header();renderSetup();$('#newMember').focus()};
+  $('#addMember').addEventListener('click',add);$('#newMember').addEventListener('keydown',e=>{if(e.key==='Enter')add()});
+  v.querySelectorAll('[data-pick]').forEach(b=>b.addEventListener('click',()=>{const id=b.dataset.pick;ui.sel=ui.sel.includes(id)?ui.sel.filter(x=>x!==id):[...ui.sel,id];renderSetup()}));
+  $('#addGroup').addEventListener('click',()=>{const key=[...ui.sel].sort().join('.');if(S.team.groups.some(g=>[...g.members].sort().join('.')===key)){toast('That synergy is already listed');return}
+    const order=S.team.members.map(m=>m.id);S.team.groups.push({id:uid('g'),members:[...ui.sel].sort((a,b)=>order.indexOf(a)-order.indexOf(b)),note:''});ui.sel=[];S.example=false;save();renderSetup()});
+  v.querySelectorAll('[data-gnote]').forEach(i=>i.addEventListener('input',e=>{S.team.groups.find(g=>g.id===e.target.dataset.gnote).note=e.target.value;save()}));
+  v.querySelectorAll('[data-gdel]').forEach(b=>b.addEventListener('click',()=>{S.team.groups=S.team.groups.filter(g=>g.id!==b.dataset.gdel);S.example=false;save();renderSetup()}));
+  $('#copySetup').addEventListener('click',()=>copy($('#setupCode')));}
+function copy(ta){const t=ta.value;const done=()=>toast('Copied');
+  try{navigator.clipboard.writeText(t).then(done,()=>{ta.select();toast('Selected. Press Ctrl+C or ⌘C to copy')})}catch(e){ta.select();toast('Selected. Press Ctrl+C or ⌘C to copy')}}
+
+/* ---------------- 2. score ---------------- */
+function blankDraft(){const d={solo:{},syn:{}};const ex=S.sets.find(x=>x.byId===ui.scorer);
+  S.team.members.forEach(m=>d.solo[m.id]=ex&&Number.isFinite(ex.solo[m.id])?ex.solo[m.id]:'');S.team.groups.forEach(g=>d.syn[g.id]=ex&&Number.isFinite(ex.syn[g.id])?ex.syn[g.id]:'');return d}
+function renderScore(){const T=S.team;if(!ui.scorer||(ui.scorer!=='fac'&&!T.members.some(m=>m.id===ui.scorer)))ui.scorer=null;
+  if(ui.scorer&&!ui.draft)ui.draft=blankDraft();
+  $('#view-score').innerHTML=`
+  <div class="panel">
+   <div class="panel-h"><h2>Score privately</h2><span class="muted">Your scores stay on this device until you send your code</span></div>
+   <div class="grid2" style="gap:14px">
+    <div><label class="lbl" for="joinCode">Joining a team? Paste the setup code</label>
+      <div class="row" style="margin-top:6px"><input type="text" id="joinCode" placeholder="SS1.…" style="flex:1" aria-describedby="joinHelp"><button class="btn" type="button" id="joinBtn">Load team</button></div>
+      <p class="muted" id="joinHelp" style="margin-top:6px;font-size:13px">This replaces the team on this device. Currently: <b>${esc(T.name)}</b>, ${T.members.length} people, ${T.groups.length} synergies.</p></div>
+    <div><label class="lbl" for="who">Who is scoring?</label>
+      <select id="who" style="display:block;margin-top:6px;width:100%"><option value="">Choose your name</option>${T.members.map(m=>`<option value="${m.id}" ${ui.scorer===m.id?'selected':''}>${esc(m.name)}</option>`).join('')}<option value="fac" ${ui.scorer==='fac'?'selected':''}>Facilitator (one agreed score set)</option></select></div>
+   </div>
+  </div>
+  ${ui.scorer?`
+  <div class="panel">
+   <div class="panel-h"><h3>How to score</h3></div>
+   <p>Use points on one scale for the whole team: roughly <b>100 = the company with everyone on board</b>. Solo value is what each person could build alone. A synergy is the <i>extra</i> value that only appears when that group works together. A synergy can be negative when two people overlap or clash. Leave a box blank if you have no view.</p>
+  </div>
+  <div class="grid2">
+   <div class="panel"><div class="panel-h"><h3>Solo value</h3><span class="muted">${T.members.length} scores</span></div>
+    <div class="list">${T.members.map(m=>`<div class="item"><span class="dot" style="background:${col(m.id)}"></span><label for="so-${m.id}" class="grow">${esc(m.name)}${m.id===ui.scorer?' <span class="muted">(you)</span>':''}</label>
+      <input type="number" id="so-${m.id}" data-solo="${m.id}" min="0" max="100" step="1" inputmode="numeric" value="${ui.draft.solo[m.id]}"></div>`).join('')}</div></div>
+   <div class="panel"><div class="panel-h"><h3>Synergies</h3><span class="muted">${T.groups.length} scores</span></div>
+    <div class="list">${T.groups.map(g=>`<div class="item"><div class="grow"><label for="sy-${g.id}"><b>${esc(gName(g))}</b></label>${g.note?`<div class="muted" style="font-size:13px">${esc(g.note)}</div>`:''}</div>
+      <input type="number" id="sy-${g.id}" data-syn="${g.id}" min="-100" max="100" step="1" inputmode="numeric" value="${ui.draft.syn[g.id]}"></div>`).join('')||'<p class="muted">No synergies in this setup.</p>'}</div></div>
+  </div>
+  <div class="panel">
+   <div class="panel-h"><h3>Your scores give this split</h3><span class="muted" id="sumNote"></span></div>
+   <div id="preview"></div>
+   <div class="row">
+    <button class="btn primary" type="button" id="makeCode">Create my score code</button>
+    <button class="btn" type="button" id="addHere">Add to results on this device</button>
+   </div>
+   <textarea id="scoreCode" readonly hidden aria-label="Your score code"></textarea>
+   <p class="muted" id="codeHelp" hidden>Send this code to your facilitator, who pastes it under <b>Combine scores</b>. Nobody sees your numbers until you send it.</p>
+  </div>`:`<div class="panel"><p class="muted">Choose your name above to start. Each founder fills this in alone, without looking at anyone else's numbers.</p></div>`}`;
+  $('#joinBtn').addEventListener('click',()=>{const raw=$('#joinCode').value.trim();try{if(!raw.startsWith('SS1.'))throw 0;const o=dec(raw.slice(4));if(!o.team||!o.team.members)throw 0;
+    S={team:o.team,sets:[],example:false};ui={tab:'score',scorer:null,draft:null,sel:[]};save();header();renderScore();toast('Team loaded: '+o.team.name)}catch(e){toast('That is not a valid setup code')}});
+  $('#who').addEventListener('change',e=>{ui.scorer=e.target.value||null;ui.draft=null;renderScore()});
+  if(!ui.scorer)return;
+  const v=$('#view-score');
+  v.querySelectorAll('[data-solo]').forEach(i=>i.addEventListener('input',e=>{ui.draft.solo[e.target.dataset.solo]=e.target.value===''?'':+e.target.value;preview()}));
+  v.querySelectorAll('[data-syn]').forEach(i=>i.addEventListener('input',e=>{ui.draft.syn[e.target.dataset.syn]=e.target.value===''?'':+e.target.value;preview()}));
+  $('#makeCode').addEventListener('click',()=>{const ta=$('#scoreCode');ta.hidden=false;$('#codeHelp').hidden=false;ta.value='SC1.'+enc(packDraft());copy(ta)});
+  $('#addHere').addEventListener('click',()=>{addSet(packDraft());toast('Added to results');});
+  preview();}
+function packDraft(){const clean=o=>{const r={};for(const k in o)if(o[k]!==''&&Number.isFinite(+o[k]))r[k]=+o[k];return r};
+  const byId=ui.scorer;const by=byId==='fac'?'Facilitator':nameOf(byId);return{f:fingerprint(),byId,by,solo:clean(ui.draft.solo),syn:clean(ui.draft.syn)}}
+function preview(){const d=packDraft();const solo={},syn={};S.team.members.forEach(m=>solo[m.id]=d.solo[m.id]||0);S.team.groups.forEach(g=>syn[g.id]=d.syn[g.id]||0);
+  const r=shapley(solo,syn);const sh=shares(r.phi,r.total);
+  $('#sumNote').textContent='Whole-team value from your scores: '+fmt(r.total,0)+' points';
+  $('#preview').innerHTML=r.total>0?`<div class="stack" role="img" aria-label="Your implied split">${S.team.members.map(m=>`<div style="flex:${Math.max(0,sh[m.id])};background:${col(m.id)}" title="${esc(m.name)} ${fmt(sh[m.id])}%">${sh[m.id]>=6?esc(m.name)+' '+fmt(sh[m.id])+'%':''}</div>`).join('')}<div style="flex:${S.team.pool};background:#8E99AB">${S.team.pool>=6?'Pool '+S.team.pool+'%':''}</div></div>`
+    :'<p class="muted">Enter some scores to see the split.</p>'}
+
+/* ---------------- 3. combine ---------------- */
+function addSet(d){const i=S.sets.findIndex(x=>x.byId===d.byId);const set={by:d.by,byId:d.byId,solo:d.solo,syn:d.syn};if(i>=0)S.sets[i]=set;else S.sets.push(set);
+  if(S.example){S.sets=S.sets.filter(x=>x.byId!=='video');S.example=false}save();header()}
+function renderCombine(){const T=S.team;const scored=new Set(S.sets.map(x=>x.byId));const missing=T.members.filter(m=>!scored.has(m.id));
+  $('#view-combine').innerHTML=`
+  <div class="grid2">
+   <div class="panel">
+    <div class="panel-h"><h2>Paste score codes</h2></div>
+    <p>Paste one or more codes, separated by spaces or new lines. A newer code from the same person replaces the older one.</p>
+    <textarea id="pasteCodes" placeholder="SC1.…" aria-label="Score codes"></textarea>
+    <div class="row"><button class="btn primary" type="button" id="addCodes">Add scores</button><span class="muted" id="addMsg" role="status"></span></div>
+   </div>
+   <div class="panel">
+    <div class="panel-h"><h2>Score sets</h2><span class="muted">${S.sets.length} included</span></div>
+    <div class="list">${S.sets.map((x,i)=>`<div class="item"><span class="dot" style="background:${x.byId==='fac'||x.byId==='video'?'#8E99AB':col(x.byId)}"></span><span class="grow"><b>${esc(x.by)}</b> <span class="muted">· ${Object.keys(x.solo).length+Object.keys(x.syn).length} scores</span></span>
+      <button class="btn small ghost" type="button" data-rm="${i}">Remove</button></div>`).join('')||'<p class="muted">No scores yet. Paste codes on the left, or score on this device under Score privately.</p>'}</div>
+    ${missing.length&&S.sets.length?`<div class="callout warn">Still waiting for: ${missing.map(m=>esc(m.name)).join(', ')}</div>`:''}
+   </div>
+  </div>`;
+  $('#addCodes').addEventListener('click',()=>{const parts=$('#pasteCodes').value.split(/\s+/).filter(Boolean);let ok=0,bad=0,stale=0;const fp=fingerprint();
+    for(const p of parts){try{if(!p.startsWith('SC1.'))throw 0;const d=dec(p.slice(4));if(d.f!==fp){stale++;continue}addSet(d);ok++}catch(e){bad++}}
+    renderCombine();$('#addMsg').textContent=[ok&&ok+' added',stale&&stale+' from a different team setup',bad&&bad+' not readable'].filter(Boolean).join(' · ')||'Nothing to add'});
+  document.querySelectorAll('[data-rm]').forEach(b=>b.addEventListener('click',()=>{S.sets.splice(+b.dataset.rm,1);save();renderCombine()}));}
+
+/* ---------------- 4. results ---------------- */
+function renderResults(){const T=S.team;const box=$('#view-results');
+  if(!S.sets.length){box.innerHTML=`<div class="panel"><h2>No scores yet</h2><p class="muted">Results appear once at least one score set is added. Score on this device or paste codes under Combine scores.</p></div>`;return}
+  const A=averaged();const r=shapley(A.solo,A.syn);const sh=shares(r.phi,r.total);const n=T.members.length;const pot=100-T.pool;
+  const order=[...T.members].sort((a,b)=>r.phi[b.id]-r.phi[a.id]);
+  const maxPhi=Math.max(...order.map(m=>r.phi[m.id]),1);
+  const negatives=T.members.filter(m=>r.phi[m.id]<=0);
+  // disagreement flags
+  const flags=[];if(S.sets.length>1){T.members.forEach(m=>{const s=A.spread['s'+m.id];if(s.n>1&&s.max-s.min>=Math.max(5,0.5*Math.abs(s.avg)))flags.push({what:m.name+' (solo)',...s})});
+    T.groups.forEach(g=>{const s=A.spread['g'+g.id];if(s.n>1&&s.max-s.min>=Math.max(5,0.5*Math.abs(s.avg)))flags.push({what:gName(g),...s})});flags.sort((a,b)=>(b.max-b.min)-(a.max-a.min))}
+  const per=S.sets.map(x=>{const so={},sy={};T.members.forEach(m=>so[m.id]=Number.isFinite(x.solo[m.id])?x.solo[m.id]:A.solo[m.id]);T.groups.forEach(g=>sy[g.id]=Number.isFinite(x.syn[g.id])?x.syn[g.id]:A.syn[g.id]);const rr=shapley(so,sy);return{by:x.by,sh:shares(rr.phi,rr.total)}});
+  const cc=crossCheck(A.solo,A.syn);const maxDiff=cc?Math.max(...T.members.map((m,i)=>Math.abs(cc.phi[i]-r.phi[m.id]))):null;
+  const inputs=n+T.groups.length;const coal=Math.pow(2,n)-1;
+  box.innerHTML=`
+  ${S.example?`<div class="callout">This is the <b>LoopBox example</b> from the course video, scored as one agreed set. Use <b>Start a new team</b> to run your own.</div>`:''}
+  <div class="panel">
+   <div class="panel-h"><h2>${esc(T.name)}: founder equity</h2><span class="muted">Averaged over ${S.sets.length} score set${S.sets.length>1?'s':''} · ${T.pool}% option pool</span></div>
+   <div class="stack" role="img" aria-label="Equity split">${order.map(m=>`<div style="flex:${Math.max(0,sh[m.id])};background:${col(m.id)}">${sh[m.id]>=7?esc(m.name)+' '+fmt(sh[m.id])+'%':''}</div>`).join('')}<div style="flex:${T.pool};background:#8E99AB">${T.pool>=7?'Pool '+T.pool+'%':''}</div></div>
+   ${r.total<=0?`<div class="callout warn">The scores add up to ${fmt(r.total,0)} points in total, so there is nothing to split. Check for large negative synergies.</div>`:''}
+   ${negatives.length&&r.total>0?`<div class="callout warn">${negatives.map(m=>esc(m.name)).join(', ')} ${negatives.length>1?'come':'comes'} out at zero or below. That happens when negative synergies outweigh their solo value. Discuss it before using these numbers.</div>`:''}
+   <div class="tbl-wrap"><table>
+    <thead><tr><th>Person</th><th class="r">Shapley points</th><th style="width:34%"></th><th class="r">Equity</th><th class="r">Equal split</th></tr></thead>
+    <tbody>${order.map(m=>`<tr><td><span class="row" style="gap:8px"><span class="dot" style="background:${col(m.id)}"></span><b>${esc(m.name)}</b></span></td>
+      <td class="r num">${fmt(r.phi[m.id])}</td><td><div class="bar"><i style="width:${Math.max(0,r.phi[m.id])/maxPhi*100}%;background:${col(m.id)}"></i></div></td>
+      <td class="r num"><b>${fmt(sh[m.id])}%</b></td><td class="r num muted">${fmt(pot/n)}%</td></tr>`).join('')}
+     <tr><td><span class="row" style="gap:8px"><span class="dot" style="background:#8E99AB"></span>Option pool</span></td><td class="r num">–</td><td></td><td class="r num"><b>${fmt(T.pool)}%</b></td><td class="r num muted">${fmt(T.pool)}%</td></tr>
+     <tr><td><b>Total</b></td><td class="r num"><b>${fmt(r.total)}</b></td><td></td><td class="r num"><b>100.0%</b></td><td></td></tr></tbody></table></div>
+  </div>
+  <div class="grid2">
+   <div class="panel"><div class="panel-h"><h3>Where each share comes from</h3></div>
+    <label class="lbl" for="decomp">Show</label>
+    <select id="decomp">${order.map(m=>`<option value="${m.id}">${esc(m.name)}</option>`).join('')}</select>
+    <div id="decompOut"></div></div>
+   <div class="panel"><div class="panel-h"><h3>Where scorers disagree</h3><span class="muted">${S.sets.length>1?flags.length+' flagged':'Needs 2+ score sets'}</span></div>
+    ${S.sets.length<2?'<p class="muted">Once several founders send codes, items with widely different scores appear here. Talk those through first: they move the split most.</p>':
+     flags.length?`<div class="list">${flags.slice(0,8).map(f=>`<div class="item"><span class="grow"><b>${esc(f.what)}</b></span><span class="num">${fmt(f.min,0)} – ${fmt(f.max,0)}</span><span class="badge warn">avg ${fmt(f.avg)}</span></div>`).join('')}</div>`:'<div class="callout ok">No large disagreements. Every item is within a reasonable range across scorers.</div>'}
+   </div>
+  </div>
+  ${S.sets.length>1?`<div class="panel"><div class="panel-h"><h3>Each scorer's own split</h3><span class="muted">Blanks are filled with the team average</span></div>
+   <div class="tbl-wrap"><table class="cmp"><thead><tr><th>Scorer</th>${order.map(m=>`<th class="r">${esc(m.name)}</th>`).join('')}</tr></thead>
+   <tbody>${per.map(p=>`<tr><td style="font-family:var(--body)"><b>${esc(p.by)}</b></td>${order.map(m=>`<td class="r">${fmt(p.sh[m.id])}%</td>`).join('')}</tr>`).join('')}
+   <tr><td style="font-family:var(--body)"><b>Average</b></td>${order.map(m=>`<td class="r"><b>${fmt(sh[m.id])}%</b></td>`).join('')}</tr></tbody></table></div></div>`:''}
+  <div class="panel"><div class="panel-h"><h3>Computation check</h3><span class="badge ok">${cc&&maxDiff<1e-9?'Verified':'Shortcut only'}</span></div>
+   <div class="row" style="gap:28px">
+    <div class="stat"><span class="muted">Scores entered per founder</span><b>${inputs}</b></div>
+    <div class="stat"><span class="muted">Coalitions a full table needs</span><b>${coal.toLocaleString()}</b></div>
+    <div class="stat"><span class="muted">Joining orders covered</span><b>${factStr(n)}</b></div>
+   </div>
+   <p class="muted">${cc?`The app rebuilt all ${cc.coalitions.toLocaleString()} coalition values from your scores and ran the textbook Shapley formula in ${fmt(cc.ms,1)} ms. Largest difference from the shortcut: ${maxDiff<1e-9?'0 (identical)':maxDiff.toExponential(2)}.`:`With ${n} people the full table would have ${coal.toLocaleString()} coalitions, so the app uses the exact shortcut only. It gives the same answer as the full formula.`}</p>
+  </div>`;
+  const dsel=$('#decomp');const drawD=()=>{const id=dsel.value;const p=r.parts[id].filter(x=>Math.abs(x.v)>1e-9);const pos=p.filter(x=>x.v>0);const tot=pos.reduce((a,b)=>a+b.v,0)||1;
+    $('#decompOut').innerHTML=`<div class="stack" role="img" aria-label="Breakdown of ${esc(nameOf(id))}'s points">${pos.map(x=>`<div style="flex:${x.v};background:${x.label==='solo'?col(id):'var(--accent)'};opacity:${x.label==='solo'?1:.75}">${x.v/tot>=.12?fmt(x.v):''}</div>`).join('')}</div>
+     <div class="list" style="margin-top:6px">${p.map(x=>`<div class="item"><span class="grow">${x.label==='solo'?'Solo value':esc(x.label)}</span><span class="num">${x.v>=0?'+':''}${fmt(x.v)}</span></div>`).join('')}
+     <div class="item"><span class="grow"><b>Shapley points</b></span><span class="num"><b>${fmt(r.phi[id])}</b></span></div></div>`};
+  dsel.addEventListener('change',drawD);drawD();}
+function factStr(n){if(n>20)return n+'!';let f=1;for(let i=2;i<=n;i++)f*=i;return f.toLocaleString()}
+
+/* ---------------- method ---------------- */
+function renderMethod(){$('#view-method').innerHTML=`
+  <div class="panel"><h2>How to compute coalitions efficiently</h2>
+   <p>The textbook Shapley value asks for the worth of every possible group of founders, then averages each person's added value over every possible joining order. That grows fast:</p>
+   <div class="tbl-wrap"><table><thead><tr><th>Team size</th><th class="r">Coalitions to score</th><th class="r">Joining orders</th></tr></thead><tbody>
+    ${[3,5,8,10,15,20].map(n=>`<tr><td class="num">${n}</td><td class="r num">${(Math.pow(2,n)-1).toLocaleString()}</td><td class="r num">${factStr(n)}</td></tr>`).join('')}</tbody></table></div>
+   <p>Nobody can score a thousand coalitions honestly. So the app uses three ideas:</p>
+   <ol class="steps">
+    <li><b>Score building blocks, not coalitions.</b> Each person gets a solo value, and the team lists only the synergies it believes in. A coalition is worth the solo values of its members plus every synergy whose members are all inside it. In game theory these blocks are called Harsanyi dividends.</li>
+    <li><b>Use the exact shortcut.</b> With that model the Shapley value has a closed form, so no orders need to be simulated:
+     <div class="formula" style="margin-top:8px">Shapley(i) = solo(i) + Σ over synergies G that include i of value(G) ÷ size(G)</div>
+     Each synergy is shared equally among the people who create it. The work grows with the number of scores entered, so a 30-person team computes as fast as a 3-person one.</li>
+    <li><b>Average the inputs, not the arguments.</b> The Shapley value is linear, so averaging every founder's scores and then splitting gives exactly the average of their individual splits. That is why private scoring followed by averaging is fair to everyone.</li>
+   </ol>
+   <p>For teams of up to 14 people, the Results tab also rebuilds the full coalition table and runs the textbook formula (about n × 2ⁿ steps) to confirm the shortcut. For games that cannot be written as building blocks, the usual approach is to sample a few thousand random joining orders and average them (Monte Carlo estimation).</p>
+  </div>
+  <div class="panel"><h3>Before you sign anything</h3>
+   <p>Scores are assumptions, not evidence. Treat the split as the start of the conversation. Agree vesting, typically four years with a one-year cliff starting on each person's first day. Then ask a lawyer to turn the numbers into a shareholders' agreement.</p></div>`}
+
+/* ---------------- boot ---------------- */
+$('#btnExample').addEventListener('click',()=>{S=example();ui={tab:'results',scorer:null,draft:null,sel:[]};save();header();setTab('results');toast('LoopBox example loaded')});
+$('#btnNew').addEventListener('click',()=>{S={team:{name:'My team',pool:10,members:[{id:uid('m'),name:'Founder 1'},{id:uid('m'),name:'Founder 2'},{id:uid('m'),name:'Founder 3'}],groups:[]},sets:[],example:false};ui={tab:'setup',scorer:null,draft:null,sel:[]};save();header();setTab('setup');toast('New team started')});
+header();
+const h=(location.hash||'').slice(1);setTab(['setup','score','combine','results','method'].includes(h)?h:'results');
+</script>
+
+</body>
+</html>
